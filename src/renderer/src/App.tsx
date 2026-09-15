@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   AssetType,
   ResolutionScale,
+  MaskShape,
   ChampionAsset,
   ItemAsset,
+  SummonerSpellAsset,
   AnyAsset,
   CacheStats,
   UpscaleProgressPayload,
@@ -13,29 +15,91 @@ import { SearchFilter } from './components/SearchFilter';
 import { AssetGrid } from './components/AssetGrid';
 import { PreviewModal } from './components/PreviewModal';
 import { StatusBar } from './components/StatusBar';
+import { QuickBin } from './components/QuickBin';
+import { SettingsModal } from './components/SettingsModal';
 import { Loader2 } from 'lucide-react';
+
+const QUICKBIN_STORAGE_KEY = 'league-asset-vault:quickbin';
 
 export const App: React.FC = () => {
   const [versions, setVersions] = useState<string[]>([]);
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [champions, setChampions] = useState<ChampionAsset[]>([]);
   const [items, setItems] = useState<ItemAsset[]>([]);
+  const [summoners, setSummoners] = useState<SummonerSpellAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const [activeTab, setActiveTab] = useState<AssetType>('champion');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [scale, setScale] = useState<ResolutionScale>('1x');
+  const [maskShape, setMaskShape] = useState<MaskShape>('square');
 
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [progress, setProgress] = useState<UpscaleProgressPayload | null>(null);
   const [previewAsset, setPreviewAsset] = useState<AnyAsset | null>(null);
 
-  // Initialize versions on startup
+  // Settings & QuickBin modal/tray state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isQuickBinOpen, setIsQuickBinOpen] = useState(true);
+  const [pinnedAssets, setPinnedAssets] = useState<AnyAsset[]>([]);
+
+  // Load pinned items from local storage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(QUICKBIN_STORAGE_KEY);
+      if (stored) {
+        setPinnedAssets(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Failed reading quickbin from localStorage:', e);
+    }
+  }, []);
+
+  // Save pinned items to local storage
+  const savePinnedAssets = (newList: AnyAsset[]) => {
+    setPinnedAssets(newList);
+    try {
+      localStorage.setItem(QUICKBIN_STORAGE_KEY, JSON.stringify(newList));
+    } catch (e) {
+      console.warn('Failed saving quickbin to localStorage:', e);
+    }
+  };
+
+  const handleTogglePin = (asset: AnyAsset) => {
+    const exists = pinnedAssets.some((p) => p.id === asset.id);
+    if (exists) {
+      savePinnedAssets(pinnedAssets.filter((p) => p.id !== asset.id));
+    } else {
+      savePinnedAssets([...pinnedAssets, asset]);
+    }
+  };
+
+  const handleUnpin = (assetId: string) => {
+    savePinnedAssets(pinnedAssets.filter((p) => p.id !== assetId));
+  };
+
+  const handleClearQuickBin = () => {
+    savePinnedAssets([]);
+  };
+
+  const pinnedIds = useMemo(() => new Set(pinnedAssets.map((p) => p.id)), [pinnedAssets]);
+
+  // Initialize versions and settings on startup
   useEffect(() => {
     async function init() {
       try {
         setLoading(true);
+
+        // Load saved app preferences
+        try {
+          const s = await window.electronAPI.getSettings();
+          if (s.defaultScale) setScale(s.defaultScale);
+          if (s.defaultMaskShape) setMaskShape(s.defaultMaskShape);
+        } catch (err) {
+          console.warn('Could not read default settings:', err);
+        }
+
         const vers = await window.electronAPI.getVersions();
         setVersions(vers);
         if (vers.length > 0) {
@@ -67,13 +131,15 @@ export const App: React.FC = () => {
   const loadDataForVersion = async (ver: string) => {
     setLoading(true);
     try {
-      const [champsData, itemsData, stats] = await Promise.all([
+      const [champsData, itemsData, summonersData, stats] = await Promise.all([
         window.electronAPI.getChampions(ver),
         window.electronAPI.getItems(ver),
+        window.electronAPI.getSummonerSpells(ver),
         window.electronAPI.getCacheStats(),
       ]);
       setChampions(champsData);
       setItems(itemsData);
+      setSummoners(summonersData);
       setCacheStats(stats);
     } catch (err) {
       console.error('Failed loading version data:', err);
@@ -102,13 +168,16 @@ export const App: React.FC = () => {
 
   // Filtered Assets Computation
   const filteredAssets = useMemo(() => {
-    const rawList: AnyAsset[] = activeTab === 'champion' ? champions : items;
+    let rawList: AnyAsset[] = champions;
+    if (activeTab === 'item') rawList = items;
+    else if (activeTab === 'summoner') rawList = summoners;
+
     const query = searchQuery.trim().toLowerCase();
 
     return rawList.filter((asset) => {
       // Tag filter
       if (selectedTag !== 'All') {
-        if (!asset.tags.includes(selectedTag)) return false;
+        if (!asset.tags || !asset.tags.includes(selectedTag)) return false;
       }
 
       // Search query filter
@@ -119,14 +188,17 @@ export const App: React.FC = () => {
 
       if (asset.type === 'champion') {
         return asset.title.toLowerCase().includes(query);
-      } else {
+      } else if (asset.type === 'item') {
         return (
           asset.plaintext.toLowerCase().includes(query) ||
           asset.description.toLowerCase().includes(query)
         );
+      } else if (asset.type === 'summoner') {
+        return asset.description.toLowerCase().includes(query);
       }
+      return false;
     });
-  }, [activeTab, champions, items, searchQuery, selectedTag]);
+  }, [activeTab, champions, items, summoners, searchQuery, selectedTag]);
 
   // Batch upscale currently filtered assets
   const handleBatchUpscale = async () => {
@@ -144,7 +216,7 @@ export const App: React.FC = () => {
 
   // Single asset upscale from card or modal
   const handleUpscaleSingle = async (asset: AnyAsset, targetScale: ResolutionScale) => {
-    const resPath = await window.electronAPI.upscaleAsset(asset, targetScale);
+    const resPath = await window.electronAPI.upscaleAsset(asset, targetScale, 3, maskShape);
     await refreshCacheStats();
     return resPath;
   };
@@ -171,12 +243,18 @@ export const App: React.FC = () => {
         onVersionChange={handleVersionChange}
         scale={scale}
         onScaleChange={setScale}
+        maskShape={maskShape}
+        onMaskShapeChange={setMaskShape}
         cacheStats={cacheStats}
         onOpenCacheDir={handleOpenCacheDir}
         onClearCache={handleClearCache}
         onBatchUpscale={handleBatchUpscale}
         isBatchProcessing={progress?.status === 'processing'}
         totalFilteredCount={filteredAssets.length}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        pinnedCount={pinnedAssets.length}
+        isQuickBinOpen={isQuickBinOpen}
+        onToggleQuickBin={() => setIsQuickBinOpen(!isQuickBinOpen)}
       />
 
       {/* Filter and Search Bar */}
@@ -185,6 +263,7 @@ export const App: React.FC = () => {
         onTabChange={setActiveTab}
         championCount={champions.length}
         itemCount={items.length}
+        summonerCount={summoners.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedTag={selectedTag}
@@ -214,8 +293,23 @@ export const App: React.FC = () => {
         <AssetGrid
           assets={filteredAssets}
           scale={scale}
+          maskShape={maskShape}
+          pinnedIds={pinnedIds}
+          onTogglePin={handleTogglePin}
           onPreview={(asset) => setPreviewAsset(asset)}
           onQuickUpscale={(asset) => handleUpscaleSingle(asset, scale)}
+        />
+      )}
+
+      {/* Project Quick Bin (Collapsible Dock Tray) */}
+      {isQuickBinOpen && (
+        <QuickBin
+          pinnedAssets={pinnedAssets}
+          onUnpin={handleUnpin}
+          onClearAll={handleClearQuickBin}
+          scale={scale}
+          maskShape={maskShape}
+          onPreview={(asset) => setPreviewAsset(asset)}
         />
       )}
 
@@ -230,8 +324,20 @@ export const App: React.FC = () => {
       <PreviewModal
         asset={previewAsset}
         scale={scale}
+        currentVersion={currentVersion}
         onClose={() => setPreviewAsset(null)}
         onUpscaleDone={refreshCacheStats}
+      />
+
+      {/* Engine & Settings Preferences Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        cacheStats={cacheStats}
+        onRefreshCacheStats={refreshCacheStats}
+        onOpenCacheFolder={handleOpenCacheDir}
+        onClearCache={handleClearCache}
+        currentVersion={currentVersion}
       />
     </div>
   );

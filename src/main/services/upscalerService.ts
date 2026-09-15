@@ -1,59 +1,87 @@
 import fs from 'fs';
-import { AnyAsset, ResolutionScale, DenoiseLevel, UpscaleProgressPayload } from '../../shared/types';
+import { AnyAsset, ResolutionScale, DenoiseLevel, MaskShape, UpscaleProgressPayload } from '../../shared/types';
 import { cacheManager } from './cacheManager';
 import { ddragonService } from './ddragonService';
 import { runWaifu2x } from '../upscaler';
 import { ImageResampler } from './imageResampler';
+import { settingsManager } from './settingsManager';
+import { AlphaMasker } from './alphaMasker';
 
 export class UpscalerService {
   private isBatchCancelled = false;
   private isProcessingBatch = false;
 
   /**
-   * Upscales a single asset to the target scale and noise level, caching it on disk.
+   * Upscales a single asset to the target scale, noise level, and mask shape, caching it on disk.
    */
   public async upscaleAsset(
     version: string,
     asset: AnyAsset,
     scale: ResolutionScale,
-    noiseLevel: DenoiseLevel = 3
+    noiseLevel: DenoiseLevel = 3,
+    maskShape: MaskShape = 'square'
   ): Promise<string> {
-    if (scale === '1x') {
-      return await ddragonService.ensureOriginalCached(version, asset);
-    }
-
-    const cachedUpscaled = cacheManager.getAssetPath(
+    const targetPath = cacheManager.getAssetPath(
       version,
       asset.type,
       asset.imageFileName,
       scale,
-      noiseLevel
+      noiseLevel,
+      maskShape
     );
 
-    if (fs.existsSync(cachedUpscaled) && fs.statSync(cachedUpscaled).size > 0) {
-      return cachedUpscaled;
+    if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
+      return targetPath;
     }
 
-    // Ensure 1x original is downloaded and cached
-    const originalPath = await ddragonService.ensureOriginalCached(version, asset);
-    const scaleNum = scale === '4x' ? 4 : 2;
+    // Step 1: Ensure the square version exists
+    let squarePath = cacheManager.getAssetPath(
+      version,
+      asset.type,
+      asset.imageFileName,
+      scale,
+      noiseLevel,
+      'square'
+    );
 
-    try {
-      // Primary: Native waifu2x-ncnn-vulkan with models-cunet and explicit noise reduction
-      await runWaifu2x(originalPath, cachedUpscaled, {
-        scale: scaleNum,
-        denoise: noiseLevel,
-        modelName: 'models-cunet',
-      });
-      return cachedUpscaled;
-    } catch (err) {
-      console.warn('[UpscalerService] waifu2x-ncnn-vulkan failed, falling back to Lanczos-3 resampler:', err);
-      // Fallback: Mathematical Lanczos-3 Resampler
-      const inputBuffer = await fs.promises.readFile(originalPath);
-      const upscaledBuffer = await ImageResampler.resample(inputBuffer, scaleNum);
-      await fs.promises.writeFile(cachedUpscaled, upscaledBuffer);
-      return cachedUpscaled;
+    if (!fs.existsSync(squarePath) || fs.statSync(squarePath).size === 0) {
+      if (scale === '1x') {
+        squarePath = await ddragonService.ensureOriginalCached(version, asset);
+      } else {
+        const originalPath = await ddragonService.ensureOriginalCached(version, asset);
+        const scaleNum = scale === '4x' ? 4 : 2;
+        const settings = settingsManager.getSettings();
+
+        try {
+          // Primary: Native waifu2x-ncnn-vulkan with models-cunet and user settings
+          await runWaifu2x(originalPath, squarePath, {
+            scale: scaleNum,
+            denoise: noiseLevel,
+            modelName: 'models-cunet',
+            gpuId: settings.gpuId,
+            tileSize: settings.tileSize > 0 ? settings.tileSize : undefined,
+          });
+        } catch (err) {
+          console.warn('[UpscalerService] waifu2x failed, falling back to Lanczos-3 resampler:', err);
+          const inputBuffer = await fs.promises.readFile(originalPath);
+          const upscaledBuffer = await ImageResampler.resample(inputBuffer, scaleNum);
+          await fs.promises.writeFile(squarePath, upscaledBuffer);
+        }
+      }
     }
+
+    // Step 2: If circle mask is requested, generate transparent circle cutout
+    if (maskShape === 'circle') {
+      try {
+        await AlphaMasker.maskFileToDisk(squarePath, targetPath);
+        return targetPath;
+      } catch (maskErr) {
+        console.error('[UpscalerService] Failed applying circle mask, using square:', maskErr);
+        return squarePath;
+      }
+    }
+
+    return squarePath;
   }
 
   /**

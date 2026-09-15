@@ -1,6 +1,10 @@
-export type AssetType = 'champion' | 'item';
+export type AssetType = 'champion' | 'item' | 'summoner' | 'ability';
 
 export type ResolutionScale = '1x' | '2x' | '4x';
+
+export type DenoiseLevel = 0 | 1 | 2 | 3;
+
+export type MaskShape = 'square' | 'circle';
 
 export type UpscaleStatus = 'none' | 'queued' | 'processing' | 'ready' | 'error';
 
@@ -34,7 +38,44 @@ export interface ItemAsset {
   upscaleStatus?: UpscaleStatus;
 }
 
-export type AnyAsset = ChampionAsset | ItemAsset;
+export interface SummonerSpellAsset {
+  type: 'summoner';
+  id: string;          // e.g. "SummonerFlash"
+  key: string;         // e.g. "4"
+  name: string;        // e.g. "Flash"
+  description: string;
+  cooldown: number;
+  tags: string[];
+  imageFileName: string;
+  cdnUrl: string;
+  cachedOriginalPath?: string;
+  cachedUpscaledPath?: string;
+  upscaleStatus?: UpscaleStatus;
+}
+
+export interface AbilityAsset {
+  type: 'ability';
+  id: string;          // e.g. "AatroxQ" or "AatroxPassive"
+  championId: string;  // e.g. "Aatrox"
+  slot: 'Passive' | 'Q' | 'W' | 'E' | 'R';
+  name: string;
+  description: string;
+  imageFileName: string;
+  cdnUrl: string;
+  cachedOriginalPath?: string;
+  cachedUpscaledPath?: string;
+  upscaleStatus?: UpscaleStatus;
+}
+
+export type AnyAsset = ChampionAsset | ItemAsset | SummonerSpellAsset | AbilityAsset;
+
+export interface AppSettings {
+  gpuId: number;              // -1 = CPU, 0 = Auto/Default GPU, 1 = Secondary GPU
+  tileSize: number;           // 0 = Auto, 100, 200, 400
+  defaultDenoise: DenoiseLevel;
+  defaultScale: ResolutionScale;
+  defaultMaskShape: MaskShape;
+}
 
 export interface CacheStats {
   cacheDir: string;
@@ -54,13 +95,21 @@ export interface UpscaleProgressPayload {
   status: 'idle' | 'processing' | 'done' | 'error';
 }
 
-export type DenoiseLevel = 0 | 1 | 2 | 3;
+export interface PrecacheProgressPayload {
+  completed: number;
+  total: number;
+  currentName: string;
+  isDone: boolean;
+}
 
 export interface DragStartRequest {
   assetId: string;
   assetType: AssetType;
   scale: ResolutionScale;
   noiseLevel?: DenoiseLevel;
+  maskShape?: MaskShape;
+  imageFileName?: string;
+  cdnUrl?: string;
 }
 
 export interface DragStartResult {
@@ -74,6 +123,9 @@ export interface UpscaleGenerateRequest {
   assetType: AssetType;
   scale: ResolutionScale;
   noiseLevel: DenoiseLevel;
+  maskShape?: MaskShape;
+  imageFileName?: string;
+  cdnUrl?: string;
 }
 
 export interface UpscaleGenerateResult {
@@ -85,22 +137,45 @@ export interface UpscaleGenerateResult {
 }
 
 export interface AppElectronAPI {
+  // Data Dragon APIs
   getVersions: () => Promise<string[]>;
   getChampions: (version: string) => Promise<ChampionAsset[]>;
   getItems: (version: string) => Promise<ItemAsset[]>;
+  getSummonerSpells: (version: string) => Promise<SummonerSpellAsset[]>;
+  getChampionAbilities: (version: string, championId: string) => Promise<AbilityAsset[]>;
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) => Promise<string>;
+
+  // OS Native Drag & Clipboard APIs
   startDrag: (request: DragStartRequest) => Promise<DragStartResult>;
-  upscaleAsset: (asset: AnyAsset, scale: ResolutionScale, noiseLevel?: DenoiseLevel) => Promise<string>;
+  copyImageToClipboard: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Upscaling APIs
+  upscaleAsset: (
+    asset: AnyAsset,
+    scale: ResolutionScale,
+    noiseLevel?: DenoiseLevel,
+    maskShape?: MaskShape
+  ) => Promise<string>;
   generateUpscale: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
   getUpscaleInfo: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
   batchUpscale: (assets: AnyAsset[], scale: ResolutionScale) => Promise<void>;
   cancelBatchUpscale: () => Promise<void>;
   onUpscaleProgress: (callback: (progress: UpscaleProgressPayload) => void) => () => void;
+
+  // Cache Management APIs
   getCacheStats: () => Promise<CacheStats>;
   getCacheSize: () => Promise<CacheStats>;
   openCacheDir: () => Promise<void>;
   openCacheFolder: () => Promise<void>;
   clearCache: () => Promise<{ success: boolean; stats: CacheStats }>;
+
+  // Offline Pre-cache
+  precacheAllAssets: (version: string) => Promise<void>;
+  onPrecacheProgress: (callback: (progress: PrecacheProgressPayload) => void) => () => void;
+
+  // Settings APIs
+  getSettings: () => Promise<AppSettings>;
+  saveSettings: (settings: AppSettings) => Promise<void>;
 }
 
 declare global {

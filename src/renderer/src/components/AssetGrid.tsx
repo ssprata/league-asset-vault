@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AnyAsset, ResolutionScale } from '@shared/types';
+import { AnyAsset, ResolutionScale, MaskShape } from '@shared/types';
 import { AssetCard } from './AssetCard';
 import { SearchX } from 'lucide-react';
 
 interface AssetGridProps {
   assets: AnyAsset[];
   scale: ResolutionScale;
+  maskShape?: MaskShape;
+  pinnedIds?: Set<string>;
+  onTogglePin?: (asset: AnyAsset) => void;
   onPreview: (asset: AnyAsset) => void;
   onQuickUpscale?: (asset: AnyAsset) => void;
 }
@@ -13,10 +16,12 @@ interface AssetGridProps {
 export const AssetGrid: React.FC<AssetGridProps> = ({
   assets,
   scale,
+  maskShape = 'square',
+  pinnedIds,
+  onTogglePin,
   onPreview,
   onQuickUpscale,
 }) => {
-  // Performance optimization: Render in incremental batches during rapid scroll
   const [renderLimit, setRenderLimit] = useState(80);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +90,9 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
             key={`${asset.type}-${asset.id}`}
             asset={asset}
             scale={scale}
+            maskShape={maskShape}
+            isPinned={pinnedIds?.has(asset.id)}
+            onTogglePin={onTogglePin}
             onPreview={onPreview}
             onQuickUpscale={onQuickUpscale}
           />

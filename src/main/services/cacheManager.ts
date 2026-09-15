@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app, shell } from 'electron';
-import { AssetType, CacheStats, ResolutionScale, DenoiseLevel } from '../../shared/types';
+import { AssetType, CacheStats, ResolutionScale, DenoiseLevel, MaskShape } from '../../shared/types';
 
 /**
  * Formats byte values to human-readable strings (B, KB, MB, GB).
@@ -41,30 +41,37 @@ export class CacheManager {
     type: AssetType,
     fileName: string,
     scale: ResolutionScale = '1x',
-    noiseLevel: DenoiseLevel = 3
+    noiseLevel: DenoiseLevel = 3,
+    maskShape: MaskShape = 'square'
   ): string {
     let subfolder = 'original';
     if (scale === '2x') subfolder = 'upscaled_2x';
     if (scale === '4x') subfolder = 'upscaled_4x';
 
-    const targetDir = path.join(
-      this.getVersionDir(version),
-      subfolder,
-      type === 'champion' ? 'champions' : 'items'
-    );
+    let typeFolder = 'champions';
+    if (type === 'item') typeFolder = 'items';
+    else if (type === 'summoner') typeFolder = 'summoners';
+    else if (type === 'ability') typeFolder = 'abilities';
+
+    const targetDir = path.join(this.getVersionDir(version), subfolder, typeFolder);
     this.ensureDirExists(targetDir);
 
     let rawId = path.basename(fileName, path.extname(fileName));
     if (rawId.includes('_scale')) {
       rawId = rawId.split('_scale')[0];
     }
+    if (rawId.includes('_circle')) {
+      rawId = rawId.split('_circle')[0];
+    }
+
+    const circleSuffix = maskShape === 'circle' ? '_circle' : '';
 
     if (scale === '1x') {
-      return path.join(targetDir, `${rawId}.png`);
+      return path.join(targetDir, `${rawId}${circleSuffix}.png`);
     }
 
     const scaleNum = scale === '4x' ? '4' : '2';
-    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}.png`;
+    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}${circleSuffix}.png`;
     return path.join(targetDir, fingerprintedName);
   }
 
@@ -73,9 +80,10 @@ export class CacheManager {
     type: AssetType,
     fileName: string,
     scale: ResolutionScale = '1x',
-    noiseLevel: DenoiseLevel = 3
+    noiseLevel: DenoiseLevel = 3,
+    maskShape: MaskShape = 'square'
   ): boolean {
-    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel);
+    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel, maskShape);
     return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
   }
 

@@ -11,33 +11,59 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
   ipcMain.on(IPC_CHANNELS.START_DRAG, async (event, request: DragStartRequest) => {
     try {
       const version = currentVersionGetter();
-      const { assetId, assetType, scale, noiseLevel = 3 } = request;
+      const {
+        assetId,
+        assetType,
+        scale,
+        noiseLevel = 3,
+        maskShape = 'square',
+        imageFileName,
+        cdnUrl: requestCdnUrl,
+      } = request;
 
-      // Find asset info from DDragon catalog
-      let fileName = `${assetId}.png`;
-      let cdnUrl = '';
+      // Find asset info from DDragon catalog if not passed
+      let fileName = imageFileName || `${assetId}.png`;
+      let cdnUrl = requestCdnUrl || '';
 
-      if (assetType === 'champion') {
-        const champs = await ddragonService.getChampions(version);
-        const champ = champs.find((c) => c.id === assetId);
-        if (champ) {
-          fileName = champ.imageFileName;
-          cdnUrl = champ.cdnUrl;
-        }
-      } else {
-        const items = await ddragonService.getItems(version);
-        const item = items.find((i) => i.id === assetId);
-        if (item) {
-          fileName = item.imageFileName;
-          cdnUrl = item.cdnUrl;
+      if (!cdnUrl) {
+        if (assetType === 'champion') {
+          const champs = await ddragonService.getChampions(version);
+          const champ = champs.find((c) => c.id === assetId);
+          if (champ) {
+            fileName = champ.imageFileName;
+            cdnUrl = champ.cdnUrl;
+          }
+        } else if (assetType === 'item') {
+          const items = await ddragonService.getItems(version);
+          const item = items.find((i) => i.id === assetId);
+          if (item) {
+            fileName = item.imageFileName;
+            cdnUrl = item.cdnUrl;
+          }
+        } else if (assetType === 'summoner') {
+          const spells = await ddragonService.getSummonerSpells(version);
+          const spell = spells.find((s) => s.id === assetId);
+          if (spell) {
+            fileName = spell.imageFileName;
+            cdnUrl = spell.cdnUrl;
+          }
         }
       }
 
-      // Check if requested scale & noise level is already on disk
-      let targetFilePath = cacheManager.getAssetPath(version, assetType, fileName, scale, noiseLevel);
+      // Check if requested scale, noise level, and mask shape is already on disk
+      let targetFilePath = cacheManager.getAssetPath(
+        version,
+        assetType,
+        fileName,
+        scale,
+        noiseLevel,
+        maskShape
+      );
 
       if (!fs.existsSync(targetFilePath) || fs.statSync(targetFilePath).size === 0) {
-        console.log(`[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel})`);
+        console.log(
+          `[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel}, ${maskShape})`
+        );
         const dummyAsset: any = {
           type: assetType,
           id: assetId,
@@ -45,11 +71,13 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
           cdnUrl,
         };
 
-        if (scale === '1x') {
-          targetFilePath = await ddragonService.ensureOriginalCached(version, dummyAsset);
-        } else {
-          targetFilePath = await upscalerService.upscaleAsset(version, dummyAsset, scale, noiseLevel);
-        }
+        targetFilePath = await upscalerService.upscaleAsset(
+          version,
+          dummyAsset,
+          scale,
+          noiseLevel,
+          maskShape
+        );
       }
 
       // Ensure normalized Windows absolute path for Win32 CF_HDROP payload

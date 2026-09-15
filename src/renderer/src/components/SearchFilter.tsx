@@ -1,13 +1,16 @@
 import React from 'react';
 import { AssetType } from '@shared/types';
 import { CHAMPION_TAGS, ITEM_TAGS } from '@shared/constants';
-import { Search, X, Users, Package } from 'lucide-react';
+import { Search, X, Users, Package, Wand2 } from 'lucide-react';
+
+const SUMMONER_TAGS = ['All', 'CLASSIC', 'ARAM', 'CHERRY', 'URF'] as const;
 
 interface SearchFilterProps {
   activeTab: AssetType;
   onTabChange: (tab: AssetType) => void;
   championCount: number;
   itemCount: number;
+  summonerCount: number;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   selectedTag: string;
@@ -20,13 +23,25 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
   onTabChange,
   championCount,
   itemCount,
+  summonerCount,
   searchQuery,
   onSearchChange,
   selectedTag,
   onTagSelect,
   filteredCount,
 }) => {
-  const currentTags = activeTab === 'champion' ? CHAMPION_TAGS : ITEM_TAGS;
+  const currentTags =
+    activeTab === 'champion'
+      ? CHAMPION_TAGS
+      : activeTab === 'item'
+      ? ITEM_TAGS
+      : SUMMONER_TAGS;
+
+  const getPlaceholder = () => {
+    if (activeTab === 'champion') return 'Search champions, titles (e.g. Yasuo, Blade)...';
+    if (activeTab === 'item') return 'Search items, stats (e.g. Infinity, Boots)...';
+    return 'Search summoner spells (e.g. Flash, Ignite, Smite)...';
+  };
 
   return (
     <div
@@ -41,7 +56,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
     >
       {/* Top row: Tab Switcher & Search Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        {/* Main Tab Toggle: Champions vs Items */}
+        {/* Main Tab Toggle: Champions vs Items vs Summoner Spells */}
         <div
           style={{
             display: 'flex',
@@ -52,56 +67,88 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
             gap: 4,
           }}
         >
+          {/* Champions */}
           <button
             onClick={() => {
               onTabChange('champion');
               onTagSelect('All');
             }}
             style={{
-              background: activeTab === 'champion'
-                ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
-                : 'transparent',
+              background:
+                activeTab === 'champion'
+                  ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
+                  : 'transparent',
               border: activeTab === 'champion' ? '1px solid var(--gold-primary)' : '1px solid transparent',
               color: activeTab === 'champion' ? '#ffffff' : 'var(--text-secondary)',
-              padding: '6px 16px',
+              padding: '6px 14px',
               borderRadius: 6,
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 7,
               transition: 'all 0.15s ease',
             }}
           >
-            <Users size={16} color={activeTab === 'champion' ? '#c8aa6e' : '#64748b'} />
+            <Users size={15} color={activeTab === 'champion' ? '#c8aa6e' : '#64748b'} />
             Champions ({championCount})
           </button>
 
+          {/* Items */}
           <button
             onClick={() => {
               onTabChange('item');
               onTagSelect('All');
             }}
             style={{
-              background: activeTab === 'item'
-                ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
-                : 'transparent',
+              background:
+                activeTab === 'item'
+                  ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
+                  : 'transparent',
               border: activeTab === 'item' ? '1px solid var(--gold-primary)' : '1px solid transparent',
               color: activeTab === 'item' ? '#ffffff' : 'var(--text-secondary)',
-              padding: '6px 16px',
+              padding: '6px 14px',
               borderRadius: 6,
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 7,
               transition: 'all 0.15s ease',
             }}
           >
-            <Package size={16} color={activeTab === 'item' ? '#c8aa6e' : '#64748b'} />
+            <Package size={15} color={activeTab === 'item' ? '#c8aa6e' : '#64748b'} />
             Items ({itemCount})
+          </button>
+
+          {/* Summoner Spells */}
+          <button
+            onClick={() => {
+              onTabChange('summoner');
+              onTagSelect('All');
+            }}
+            style={{
+              background:
+                activeTab === 'summoner'
+                  ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
+                  : 'transparent',
+              border: activeTab === 'summoner' ? '1px solid var(--gold-primary)' : '1px solid transparent',
+              color: activeTab === 'summoner' ? '#ffffff' : 'var(--text-secondary)',
+              padding: '6px 14px',
+              borderRadius: 6,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Wand2 size={15} color={activeTab === 'summoner' ? '#c8aa6e' : '#64748b'} />
+            Spells ({summonerCount})
           </button>
         </div>
 
@@ -124,7 +171,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={`Search ${activeTab === 'champion' ? 'champion names, titles (e.g. Yasuo, Blade)' : 'item names, stats (e.g. Infinity, Boots)'}...`}
+            placeholder={getPlaceholder()}
             style={{
               width: '100%',
               background: 'rgba(5, 8, 17, 0.85)',

@@ -4,6 +4,7 @@ import {
   AnyAsset,
   ResolutionScale,
   DenoiseLevel,
+  MaskShape,
   UpscaleGenerateRequest,
   UpscaleGenerateResult,
   UpscaleProgressPayload,
@@ -19,52 +20,76 @@ export function registerUpscalerHandler(
   // Legacy or quick single-asset upscale
   ipcMain.handle(
     IPC_CHANNELS.UPSCALE_ASSET,
-    async (_event, asset: AnyAsset, scale: ResolutionScale, noiseLevel: DenoiseLevel = 3) => {
+    async (
+      _event,
+      asset: AnyAsset,
+      scale: ResolutionScale,
+      noiseLevel: DenoiseLevel = 3,
+      maskShape: MaskShape = 'square'
+    ) => {
       const version = currentVersionGetter();
-      return await upscalerService.upscaleAsset(version, asset, scale, noiseLevel);
+      return await upscalerService.upscaleAsset(version, asset, scale, noiseLevel, maskShape);
     }
   );
 
-  // Dedicated generate handler with explicit scale and noiseLevel
+  // Dedicated generate handler with explicit scale, noiseLevel, and maskShape
   ipcMain.handle(
     IPC_CHANNELS.GENERATE_UPSCALE,
     async (_event, request: UpscaleGenerateRequest): Promise<UpscaleGenerateResult> => {
       const version = currentVersionGetter();
-      const { assetId, assetType, scale, noiseLevel } = request;
+      const { assetId, assetType, scale, noiseLevel, maskShape = 'square' } = request;
 
       try {
-        let targetAsset: AnyAsset | undefined;
-        if (assetType === 'champion') {
-          const champs = await ddragonService.getChampions(version);
-          targetAsset = champs.find((c) => c.id === assetId);
-        } else {
-          const items = await ddragonService.getItems(version);
-          targetAsset = items.find((i) => i.id === assetId);
-        }
+        let fileName = request.imageFileName || `${assetId}.png`;
+        let cdnUrl = request.cdnUrl || '';
 
-        if (!targetAsset) {
-          return {
-            success: false,
-            filePath: '',
-            fromCache: false,
-            dataUrl: null,
-            error: `Asset ${assetId} not found in version ${version}`,
-          };
+        if (!request.cdnUrl) {
+          if (assetType === 'champion') {
+            const champs = await ddragonService.getChampions(version);
+            const target = champs.find((c) => c.id === assetId);
+            if (target) {
+              fileName = target.imageFileName;
+              cdnUrl = target.cdnUrl;
+            }
+          } else if (assetType === 'item') {
+            const items = await ddragonService.getItems(version);
+            const target = items.find((i) => i.id === assetId);
+            if (target) {
+              fileName = target.imageFileName;
+              cdnUrl = target.cdnUrl;
+            }
+          } else if (assetType === 'summoner') {
+            const spells = await ddragonService.getSummonerSpells(version);
+            const target = spells.find((s) => s.id === assetId);
+            if (target) {
+              fileName = target.imageFileName;
+              cdnUrl = target.cdnUrl;
+            }
+          }
         }
 
         const isCached = cacheManager.assetExists(
           version,
           assetType,
-          targetAsset.imageFileName,
+          fileName,
           scale,
-          noiseLevel
+          noiseLevel,
+          maskShape
         );
+
+        const dummyAsset: AnyAsset = {
+          type: assetType,
+          id: assetId,
+          imageFileName: fileName,
+          cdnUrl,
+        } as any;
 
         const filePath = await upscalerService.upscaleAsset(
           version,
-          targetAsset,
+          dummyAsset,
           scale,
-          noiseLevel
+          noiseLevel,
+          maskShape
         );
 
         const dataUrl = await upscalerService.getFileDataUrl(filePath);
@@ -88,18 +113,32 @@ export function registerUpscalerHandler(
     }
   );
 
-  // Inspector query to check if a specific parameter combination is already cached on disk
+  // Query to check if a specific parameter combination is already cached on disk
   ipcMain.handle(
     IPC_CHANNELS.GET_UPSCALE_INFO,
     async (_event, request: UpscaleGenerateRequest): Promise<UpscaleGenerateResult> => {
       const version = currentVersionGetter();
-      const { assetId, assetType, scale, noiseLevel } = request;
+      const { assetId, assetType, scale, noiseLevel, maskShape = 'square' } = request;
 
-      const fileName = `${assetId}.png`;
-      const isCached = cacheManager.assetExists(version, assetType, fileName, scale, noiseLevel);
+      const fileName = request.imageFileName || `${assetId}.png`;
+      const isCached = cacheManager.assetExists(
+        version,
+        assetType,
+        fileName,
+        scale,
+        noiseLevel,
+        maskShape
+      );
 
       if (isCached) {
-        const filePath = cacheManager.getAssetPath(version, assetType, fileName, scale, noiseLevel);
+        const filePath = cacheManager.getAssetPath(
+          version,
+          assetType,
+          fileName,
+          scale,
+          noiseLevel,
+          maskShape
+        );
         const dataUrl = await upscalerService.getFileDataUrl(filePath);
         return {
           success: true,

@@ -3,6 +3,7 @@ import path from 'path';
 import { registerDragHandler } from './ipc/dragHandler';
 import { registerDDragonHandler } from './ipc/ddragonHandler';
 import { registerUpscalerHandler } from './ipc/upscalerHandler';
+import { registerClipboardHandler } from './ipc/clipboardHandler';
 
 let mainWindow: BrowserWindow | null = null;
 let currentActiveVersion = '14.24.1'; // Updated dynamically on launch
@@ -53,12 +54,14 @@ app.whenReady().then(() => {
     () => currentActiveVersion,
     (v: string) => {
       currentActiveVersion = v;
-    }
+    },
+    () => mainWindow
   );
   registerUpscalerHandler(
     () => currentActiveVersion,
     () => mainWindow
   );
+  registerClipboardHandler();
 
   createWindow();
 
