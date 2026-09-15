@@ -1,0 +1,72 @@
+{
+  "name": "league-asset-vault",
+  "version": "1.0.0",
+  "description": "Standalone League of Legends asset library & super-resolution upscaler for video editors and creators",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k -r \"npm.cmd run dev:vite\" \"npm.cmd run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm.cmd run build:renderer && npm.cmd run build:electron && electron-builder",
+    "package:dir": "npm.cmd run build:renderer && npm.cmd run build:electron && electron-builder --dir"
+  },
+  "keywords": [
+    "league-of-legends",
+    "ddragon",
+    "asset-library",
+    "super-resolution",
+    "premiere-pro",
+    "drag-and-drop",
+    "electron"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "@types/pngjs": "^6.0.5",
+    "lucide-react": "^1.16.0",
+    "pngjs": "^7.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.antigravity.leagueassetvault",
+    "productName": "League Asset Vault",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "extraResources": [
+      {
+        "from": "resources/bin/waifu2x",
+        "to": "bin/waifu2x",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}
