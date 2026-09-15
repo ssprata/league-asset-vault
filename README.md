@@ -127,7 +127,7 @@ League-Images-Tool/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/league-asset-vault.git
+git clone https://github.com/ssprata/league-asset-vault.git
 cd league-asset-vault
 ```
 
