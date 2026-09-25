@@ -1,7 +1,7 @@
 import React from 'react';
 import { AssetType } from '@shared/types';
-import { CHAMPION_TAGS, ITEM_TAGS } from '@shared/constants';
-import { Search, X, Users, Package, Wand2 } from 'lucide-react';
+import { CHAMPION_TAGS, ITEM_TAGS, RUNE_TAGS } from '@shared/constants';
+import { Search, X, Users, Package, Wand2, Sparkles } from 'lucide-react';
 
 const SUMMONER_TAGS = ['All', 'CLASSIC', 'ARAM', 'CHERRY', 'URF'] as const;
 
@@ -11,6 +11,7 @@ interface SearchFilterProps {
   championCount: number;
   itemCount: number;
   summonerCount: number;
+  runeCount?: number;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   selectedTag: string;
@@ -24,6 +25,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
   championCount,
   itemCount,
   summonerCount,
+  runeCount = 0,
   searchQuery,
   onSearchChange,
   selectedTag,
@@ -35,11 +37,14 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
       ? CHAMPION_TAGS
       : activeTab === 'item'
       ? ITEM_TAGS
+      : activeTab === 'rune'
+      ? RUNE_TAGS
       : SUMMONER_TAGS;
 
   const getPlaceholder = () => {
     if (activeTab === 'champion') return 'Search champions, titles (e.g. Yasuo, Blade)...';
     if (activeTab === 'item') return 'Search items, stats (e.g. Infinity, Boots)...';
+    if (activeTab === 'rune') return 'Search runes, keystones (e.g. Conqueror, Electrocute)...';
     return 'Search summoner spells (e.g. Flash, Ignite, Smite)...';
   };
 
@@ -56,7 +61,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
     >
       {/* Top row: Tab Switcher & Search Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        {/* Main Tab Toggle: Champions vs Items vs Summoner Spells */}
+        {/* Main Tab Toggle: Champions vs Items vs Summoner Spells vs Runes */}
         <div
           style={{
             display: 'flex',
@@ -149,6 +154,34 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
           >
             <Wand2 size={15} color={activeTab === 'summoner' ? '#c8aa6e' : '#64748b'} />
             Spells ({summonerCount})
+          </button>
+
+          {/* Runes Reforged */}
+          <button
+            onClick={() => {
+              onTabChange('rune');
+              onTagSelect('All');
+            }}
+            style={{
+              background:
+                activeTab === 'rune'
+                  ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
+                  : 'transparent',
+              border: activeTab === 'rune' ? '1px solid var(--gold-primary)' : '1px solid transparent',
+              color: activeTab === 'rune' ? '#ffffff' : 'var(--text-secondary)',
+              padding: '6px 14px',
+              borderRadius: 6,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Sparkles size={15} color={activeTab === 'rune' ? '#c8aa6e' : '#64748b'} />
+            Runes ({runeCount})
           </button>
         </div>
 

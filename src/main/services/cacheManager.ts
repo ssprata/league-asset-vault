@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app, shell } from 'electron';
-import { AssetType, CacheStats, ResolutionScale, DenoiseLevel, MaskShape } from '../../shared/types';
+import { AssetType, CacheStats, ResolutionScale, DenoiseLevel, MaskShape, FrameStyle } from '../../shared/types';
 
 /**
  * Formats byte values to human-readable strings (B, KB, MB, GB).
@@ -42,7 +42,8 @@ export class CacheManager {
     fileName: string,
     scale: ResolutionScale = '1x',
     noiseLevel: DenoiseLevel = 3,
-    maskShape: MaskShape = 'square'
+    maskShape: MaskShape = 'square',
+    frameStyle: FrameStyle = 'none'
   ): string {
     let subfolder = 'original';
     if (scale === '2x') subfolder = 'upscaled_2x';
@@ -52,6 +53,8 @@ export class CacheManager {
     if (type === 'item') typeFolder = 'items';
     else if (type === 'summoner') typeFolder = 'summoners';
     else if (type === 'ability') typeFolder = 'abilities';
+    else if (type === 'rune') typeFolder = 'runes';
+    else if (type === 'skin') typeFolder = 'skins';
 
     const targetDir = path.join(this.getVersionDir(version), subfolder, typeFolder);
     this.ensureDirExists(targetDir);
@@ -63,15 +66,22 @@ export class CacheManager {
     if (rawId.includes('_circle')) {
       rawId = rawId.split('_circle')[0];
     }
+    if (rawId.includes('_gold_border')) {
+      rawId = rawId.split('_gold_border')[0];
+    }
+    if (rawId.includes('_drop_shadow')) {
+      rawId = rawId.split('_drop_shadow')[0];
+    }
 
     const circleSuffix = maskShape === 'circle' ? '_circle' : '';
+    const frameSuffix = frameStyle && frameStyle !== 'none' ? `_${frameStyle}` : '';
 
     if (scale === '1x') {
-      return path.join(targetDir, `${rawId}${circleSuffix}.png`);
+      return path.join(targetDir, `${rawId}${circleSuffix}${frameSuffix}.png`);
     }
 
     const scaleNum = scale === '4x' ? '4' : '2';
-    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}${circleSuffix}.png`;
+    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}${circleSuffix}${frameSuffix}.png`;
     return path.join(targetDir, fingerprintedName);
   }
 
@@ -81,11 +91,13 @@ export class CacheManager {
     fileName: string,
     scale: ResolutionScale = '1x',
     noiseLevel: DenoiseLevel = 3,
-    maskShape: MaskShape = 'square'
+    maskShape: MaskShape = 'square',
+    frameStyle: FrameStyle = 'none'
   ): boolean {
-    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel, maskShape);
+    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel, maskShape, frameStyle);
     return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
   }
+
 
   public async saveAsset(
     version: string,

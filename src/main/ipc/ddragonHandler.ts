@@ -30,11 +30,24 @@ export function registerDDragonHandler(
     return await ddragonService.getSummonerSpells(version);
   });
 
+  ipcMain.handle(IPC_CHANNELS.GET_RUNES, async (_event, version: string) => {
+    currentVersionSetter(version);
+    return await ddragonService.getRunes(version);
+  });
+
   ipcMain.handle(
     IPC_CHANNELS.GET_CHAMPION_ABILITIES,
     async (_event, version: string, championId: string) => {
       currentVersionSetter(version);
       return await ddragonService.getChampionAbilities(version, championId);
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.GET_CHAMPION_SKINS,
+    async (_event, version: string, championId: string) => {
+      currentVersionSetter(version);
+      return await ddragonService.getChampionSkins(version, championId);
     }
   );
 

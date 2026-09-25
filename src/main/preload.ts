@@ -6,6 +6,7 @@ import {
   ResolutionScale,
   DenoiseLevel,
   MaskShape,
+  FrameStyle,
   DragStartRequest,
   UpscaleGenerateRequest,
   UpscaleProgressPayload,
@@ -19,8 +20,11 @@ const api: AppElectronAPI = {
   getChampions: (version: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPIONS, version),
   getItems: (version: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_ITEMS, version),
   getSummonerSpells: (version: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_SUMMONER_SPELLS, version),
+  getRunes: (version: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_RUNES, version),
   getChampionAbilities: (version: string, championId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_ABILITIES, version, championId),
+  getChampionSkins: (version: string, championId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_SKINS, version, championId),
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) =>
     ipcRenderer.invoke(IPC_CHANNELS.ENSURE_ASSET_CACHED, asset, scale),
 
@@ -37,8 +41,9 @@ const api: AppElectronAPI = {
     asset: AnyAsset,
     scale: ResolutionScale,
     noiseLevel?: DenoiseLevel,
-    maskShape?: MaskShape
-  ) => ipcRenderer.invoke(IPC_CHANNELS.UPSCALE_ASSET, asset, scale, noiseLevel, maskShape),
+    maskShape?: MaskShape,
+    frameStyle?: FrameStyle
+  ) => ipcRenderer.invoke(IPC_CHANNELS.UPSCALE_ASSET, asset, scale, noiseLevel, maskShape, frameStyle),
 
   generateUpscale: (request: UpscaleGenerateRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.GENERATE_UPSCALE, request),

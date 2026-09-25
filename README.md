@@ -16,12 +16,22 @@ League Asset Vault solves this workflow bottleneck. It fetches official game ass
 
 ### 1. Official Riot Games Data Dragon Ingestion
 - Fetches active and legacy game versions dynamically from `https://ddragon.leagueoflegends.com/api/versions.json`.
-- Ingests full metadata manifests for Champions (170+ entries), Items (860+ entries), and Summoner Spells (Flash, Ignite, Smite, etc.).
-- Fetches detailed Champion Abilities manifests (Passive, Q, W, E, R) on demand with high-resolution spell icons.
+- Ingests full metadata manifests for Champions (170+ entries), Items (860+ entries), Summoner Spells (Flash, Ignite, Smite, etc.), and Runes Reforged (all 5 trees + Keystones).
+- Fetches detailed Champion Abilities manifests (Passive, Q, W, E, R) and official Champion Skins with full HD 16:9 splash art and vertical loading screen cards.
 - Downloads icon assets on demand from Riot CDN to local disk storage; operates completely offline once cached.
 - Zero web scraping and zero API keys required.
 
-### 2. Native Windows OLE Drag-and-Drop (CF_HDROP)
+### 2. Interactive Before / After Split Comparison Slider
+- Draggable comparison lens in the preview modal comparing pixelated 1x originals against waifu2x 4x CU-Net smooth vector-grade artwork in real time.
+- Smooth mouse and touch drag control with instant visual proof of super-resolution clarity.
+- Quick toggle between interactive Split Lens and classic Side-by-Side views.
+
+### 3. Custom Framing Presets (Gold Border & Drop Shadow)
+- **Hextech Gold Border**: Crisp 2px metallic League gold outline conforming to square or circular cutouts.
+- **Soft Dark Drop Shadow**: Padded ambient shadow layer that makes icons pop immediately over bright Summoner's Rift gameplay without manual After Effects or Photoshop effects.
+- Direct output to transparent PNGs with full alpha channel preservation.
+
+### 4. Native Windows OLE Drag-and-Drop (CF_HDROP)
 - Dragging an asset card out of the window registers an authentic Win32 OLE `IDataObject` containing `CF_HDROP` (`DROPFILES`).
 - Full compatibility with:
   - Adobe Premiere Pro
@@ -31,32 +41,32 @@ League Asset Vault solves this workflow bottleneck. It fetches official game ass
   - Discord Desktop
   - Windows File Explorer
 
-### 3. Direct Native Clipboard Copy (Ctrl+C)
+### 5. Direct Native Clipboard Copy (Ctrl+C)
 - Instant 1-click or `Ctrl+C` keyboard shortcut to copy uncompressed DIB bitmap data directly into the Windows OS clipboard (`clipboard.writeImage`).
 - Allows immediate pasting into Adobe Photoshop, Figma, Discord, or any graphics suite without dragging files to disk first.
 
-### 4. Anti-Aliased Circular Alpha Cutouts (Transparent PNG)
+### 6. Anti-Aliased Circular Alpha Cutouts (Transparent PNG)
 - High-precision sub-pixel feathering algorithm generates transparent circular alpha masks (`_circle.png`).
 - Eliminates manual masking in Premiere Pro and After Effects for character portrait overlays, stream alerts, and YouTube thumbnails.
 - Supports both standard square borders and circular cutouts across all assets and upscaling scales.
 
-### 5. Project Quick Bin (Favorites Dock Tray)
+### 7. Project Quick Bin (Favorites Dock Tray)
 - Persistent project pinboard dock at the bottom of the workspace.
 - Pin frequently used champion portraits, summoner spells, or items for quick access during editing sessions.
 - Pinned items persist across application reboots via local storage.
 - Supports direct drag-and-drop and clipboard copying right from the bin.
 
-### 6. Hardware Inference Settings & Multi-GPU Support
+### 8. Hardware Inference Settings & Multi-GPU Support
 - Configurable GPU Device Selection (`-g` flag): Primary GPU (`0`), Secondary Discrete GPU (`1`), or CPU (`-1`).
 - Configurable Inference Tile Size (`-t` flag): Auto, 100 (2GB VRAM), 200 (4GB VRAM), or 400 (8GB+ High Performance).
 - Default denoise, scale, and mask shape preferences saved persistently to `%APPDATA%\league-asset-vault\settings.json`.
 
-### 7. Full Offline Pre-Caching Engine
+### 9. Full Offline Pre-Caching Engine
 - Background concurrency pool allowing users to download all original assets (champions, items, summoners, abilities) for a game patch in advance.
 - Live progress feedback showing download counts and percent completion.
 - Enables complete editing workflow functionality with zero internet connectivity.
 
-### 8. Native waifu2x-ncnn-vulkan Super-Resolution Engine
+### 10. Native waifu2x-ncnn-vulkan Super-Resolution Engine
 - Standalone Vulkan GPU-accelerated inference using the `models-cunet` (Artwork) model.
 - Multi-level noise reduction controls:
   - Level 0 (None): Maximum line sharpness, preserves source texture.
@@ -66,7 +76,7 @@ League Asset Vault solves this workflow bottleneck. It fetches official game ass
 - Parameter-fingerprinted file naming prevents stale cache collisions:
   - `<assetId>_scale<scale>x_noise<noiseLevel>[_circle].png` (e.g. `3031_scale4x_noise3.png`).
 
-### 9. Disk Cache Management
+### 11. Disk Cache Management
 - Local cache path: `%APPDATA%\league-asset-vault\cache\`.
 - Real-time disk usage calculation displayed in the application header.
 - Safe cache purging: Deletes all generated upscaled files while preserving core configuration files (`versions.json`, manifest caches) and downloaded 1x originals.

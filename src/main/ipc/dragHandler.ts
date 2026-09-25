@@ -17,6 +17,7 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
         scale,
         noiseLevel = 3,
         maskShape = 'square',
+        frameStyle = 'none',
         imageFileName,
         cdnUrl: requestCdnUrl,
       } = request;
@@ -47,22 +48,30 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
             fileName = spell.imageFileName;
             cdnUrl = spell.cdnUrl;
           }
+        } else if (assetType === 'rune') {
+          const runes = await ddragonService.getRunes(version);
+          const rune = runes.find((r) => r.id === assetId);
+          if (rune) {
+            fileName = rune.imageFileName;
+            cdnUrl = rune.cdnUrl;
+          }
         }
       }
 
-      // Check if requested scale, noise level, and mask shape is already on disk
+      // Check if requested scale, noise level, mask shape, and frame style is already on disk
       let targetFilePath = cacheManager.getAssetPath(
         version,
         assetType,
         fileName,
         scale,
         noiseLevel,
-        maskShape
+        maskShape,
+        frameStyle
       );
 
       if (!fs.existsSync(targetFilePath) || fs.statSync(targetFilePath).size === 0) {
         console.log(
-          `[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel}, ${maskShape})`
+          `[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel}, ${maskShape}, ${frameStyle})`
         );
         const dummyAsset: any = {
           type: assetType,
@@ -76,7 +85,8 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
           dummyAsset,
           scale,
           noiseLevel,
-          maskShape
+          maskShape,
+          frameStyle
         );
       }
 

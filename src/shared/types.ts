@@ -1,10 +1,12 @@
-export type AssetType = 'champion' | 'item' | 'summoner' | 'ability';
+export type AssetType = 'champion' | 'item' | 'summoner' | 'ability' | 'rune' | 'skin';
 
 export type ResolutionScale = '1x' | '2x' | '4x';
 
 export type DenoiseLevel = 0 | 1 | 2 | 3;
 
 export type MaskShape = 'square' | 'circle';
+
+export type FrameStyle = 'none' | 'gold_border' | 'drop_shadow';
 
 export type UpscaleStatus = 'none' | 'queued' | 'processing' | 'ready' | 'error';
 
@@ -67,7 +69,47 @@ export interface AbilityAsset {
   upscaleStatus?: UpscaleStatus;
 }
 
-export type AnyAsset = ChampionAsset | ItemAsset | SummonerSpellAsset | AbilityAsset;
+export interface RuneAsset {
+  type: 'rune';
+  id: string;          // e.g. "8005"
+  key: string;         // e.g. "PressTheAttack"
+  name: string;        // e.g. "Press the Attack"
+  treeId: number;      // e.g. 8000
+  treeName: string;    // e.g. "Precision"
+  slotType: 'keystone' | 'slot1' | 'slot2' | 'slot3';
+  shortDesc: string;
+  longDesc: string;
+  tags: string[];      // e.g. ["Precision", "Keystones"]
+  imageFileName: string;
+  cdnUrl: string;
+  cachedOriginalPath?: string;
+  cachedUpscaledPath?: string;
+  upscaleStatus?: UpscaleStatus;
+}
+
+export interface SkinAsset {
+  type: 'skin';
+  id: string;          // e.g. "266001"
+  championId: string;  // e.g. "Aatrox"
+  num: number;         // e.g. 1
+  name: string;        // e.g. "Justicar Aatrox"
+  chromas: boolean;
+  splashUrl: string;
+  loadingUrl: string;
+  imageFileName: string;
+  cdnUrl: string;
+  cachedOriginalPath?: string;
+  cachedUpscaledPath?: string;
+  upscaleStatus?: UpscaleStatus;
+}
+
+export type AnyAsset =
+  | ChampionAsset
+  | ItemAsset
+  | SummonerSpellAsset
+  | AbilityAsset
+  | RuneAsset
+  | SkinAsset;
 
 export interface AppSettings {
   gpuId: number;              // -1 = CPU, 0 = Auto/Default GPU, 1 = Secondary GPU
@@ -108,6 +150,8 @@ export interface DragStartRequest {
   scale: ResolutionScale;
   noiseLevel?: DenoiseLevel;
   maskShape?: MaskShape;
+  frameStyle?: FrameStyle;
+  skinViewType?: 'splash' | 'loading';
   imageFileName?: string;
   cdnUrl?: string;
 }
@@ -124,6 +168,8 @@ export interface UpscaleGenerateRequest {
   scale: ResolutionScale;
   noiseLevel: DenoiseLevel;
   maskShape?: MaskShape;
+  frameStyle?: FrameStyle;
+  skinViewType?: 'splash' | 'loading';
   imageFileName?: string;
   cdnUrl?: string;
 }
@@ -142,7 +188,9 @@ export interface AppElectronAPI {
   getChampions: (version: string) => Promise<ChampionAsset[]>;
   getItems: (version: string) => Promise<ItemAsset[]>;
   getSummonerSpells: (version: string) => Promise<SummonerSpellAsset[]>;
+  getRunes: (version: string) => Promise<RuneAsset[]>;
   getChampionAbilities: (version: string, championId: string) => Promise<AbilityAsset[]>;
+  getChampionSkins: (version: string, championId: string) => Promise<SkinAsset[]>;
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) => Promise<string>;
 
   // OS Native Drag & Clipboard APIs
@@ -154,7 +202,8 @@ export interface AppElectronAPI {
     asset: AnyAsset,
     scale: ResolutionScale,
     noiseLevel?: DenoiseLevel,
-    maskShape?: MaskShape
+    maskShape?: MaskShape,
+    frameStyle?: FrameStyle
   ) => Promise<string>;
   generateUpscale: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
   getUpscaleInfo: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
@@ -183,3 +232,4 @@ declare global {
     electronAPI: AppElectronAPI;
   }
 }
+

@@ -6,6 +6,8 @@ import {
   ItemAsset,
   SummonerSpellAsset,
   AbilityAsset,
+  RuneAsset,
+  SkinAsset,
   AnyAsset,
   ResolutionScale,
   PrecacheProgressPayload,
@@ -254,9 +256,91 @@ export class DDragonService {
   }
 
   /**
-   * Fetches the abilities (Passive, Q, W, E, R) for a specific champion.
+   * Fetches all Runes Reforged (Keystones & minor runes) across all 5 trees.
    */
-  public async getChampionAbilities(version: string, championId: string): Promise<AbilityAsset[]> {
+  public async getRunes(version: string): Promise<RuneAsset[]> {
+    const versionDir = cacheManager.getVersionDir(version);
+    const manifestPath = path.join(versionDir, 'runes_manifest.json');
+
+    let rawData: any = null;
+
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const fileContent = await fs.promises.readFile(manifestPath, 'utf-8');
+        rawData = JSON.parse(fileContent);
+      } catch (e) {
+        console.warn('[DDragonService] Corrupted local runes manifest, re-fetching...');
+      }
+    }
+
+    if (!rawData) {
+      const res = await fetch(DDRAGON_ENDPOINTS.RUNES_DATA(version));
+      if (!res.ok) {
+        throw new Error(`Failed to fetch runes data: ${res.statusText}`);
+      }
+      rawData = await res.json();
+      await fs.promises.writeFile(manifestPath, JSON.stringify(rawData, null, 2));
+    }
+
+    const runesList: RuneAsset[] = [];
+
+    if (Array.isArray(rawData)) {
+      for (const tree of rawData) {
+        const treeName = tree.name || tree.key;
+        const treeId = tree.id;
+
+        if (Array.isArray(tree.slots)) {
+          tree.slots.forEach((slot: any, slotIdx: number) => {
+            const isKeystone = slotIdx === 0;
+            const slotType = isKeystone ? 'keystone' : (`slot${slotIdx}` as any);
+
+            if (Array.isArray(slot.runes)) {
+              for (const rune of slot.runes) {
+                const imageFileName = path.basename(rune.icon);
+                const originalCached = cacheManager.assetExists(version, 'rune', imageFileName, '1x');
+                const upscaled4xCached = cacheManager.assetExists(version, 'rune', imageFileName, '4x');
+
+                runesList.push({
+                  type: 'rune',
+                  id: String(rune.id),
+                  key: rune.key,
+                  name: rune.name,
+                  treeId,
+                  treeName,
+                  slotType,
+                  shortDesc: rune.shortDesc || '',
+                  longDesc: rune.longDesc || '',
+                  tags: [treeName, isKeystone ? 'Keystones' : 'Runes'],
+                  imageFileName,
+                  cdnUrl: DDRAGON_ENDPOINTS.RUNE_IMAGE(rune.icon),
+                  cachedOriginalPath: originalCached
+                    ? cacheManager.getAssetPath(version, 'rune', imageFileName, '1x')
+                    : undefined,
+                  cachedUpscaledPath: upscaled4xCached
+                    ? cacheManager.getAssetPath(version, 'rune', imageFileName, '4x')
+                    : undefined,
+                  upscaleStatus: upscaled4xCached ? 'ready' : 'none',
+                });
+              }
+            }
+          });
+        }
+      }
+    }
+
+    return runesList.sort((a, b) => {
+      // Keystones first, then by tree, then name
+      if (a.slotType === 'keystone' && b.slotType !== 'keystone') return -1;
+      if (a.slotType !== 'keystone' && b.slotType === 'keystone') return 1;
+      if (a.treeName !== b.treeName) return a.treeName.localeCompare(b.treeName);
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  /**
+   * Internal helper to load champion detail data from cache or DDragon CDN.
+   */
+  public async getRawChampionDetail(version: string, championId: string): Promise<any> {
     const versionDir = cacheManager.getVersionDir(version);
     const manifestPath = path.join(versionDir, `champion_${championId}.json`);
 
@@ -272,7 +356,6 @@ export class DDragonService {
     }
 
     if (!rawData) {
-      // Try single champion detail endpoint first
       try {
         const res = await fetch(DDRAGON_ENDPOINTS.CHAMPION_DETAIL_DATA(version, championId));
         if (res.ok) {
@@ -283,7 +366,6 @@ export class DDragonService {
         console.warn(`[DDragonService] Failed single champ fetch for ${championId}, falling back to full data:`, err);
       }
 
-      // If single champ detail wasn't fetched, try full data
       if (!rawData) {
         const fullManifestPath = path.join(versionDir, 'championFull.json');
         let fullData: any = null;
@@ -306,10 +388,58 @@ export class DDragonService {
     }
 
     if (!rawData || !rawData.data || !rawData.data[championId]) {
-      throw new Error(`Could not load ability data for champion ${championId}`);
+      throw new Error(`Could not load data for champion ${championId}`);
     }
 
-    const champData = rawData.data[championId];
+    return rawData.data[championId];
+  }
+
+  /**
+   * Fetches all skins and splash art manifests for a specific champion.
+   */
+  public async getChampionSkins(version: string, championId: string): Promise<SkinAsset[]> {
+    const champData = await this.getRawChampionDetail(version, championId);
+    if (!champData || !champData.skins) {
+      return [];
+    }
+
+    const skins: SkinAsset[] = [];
+    for (const s of champData.skins) {
+      const num = s.num;
+      const skinName = s.name === 'default' ? `${champData.name} (Default)` : s.name;
+      const splashFile = `${championId}_${num}_splash.png`;
+      const originalCached = cacheManager.assetExists(version, 'skin', splashFile, '1x');
+      const upscaled4xCached = cacheManager.assetExists(version, 'skin', splashFile, '4x');
+
+      skins.push({
+        type: 'skin',
+        id: String(s.id || `${championId}_${num}`),
+        championId,
+        num,
+        name: skinName,
+        chromas: !!s.chromas,
+        splashUrl: DDRAGON_ENDPOINTS.SPLASH_IMAGE(championId, num),
+        loadingUrl: DDRAGON_ENDPOINTS.LOADING_IMAGE(championId, num),
+        imageFileName: splashFile,
+        cdnUrl: DDRAGON_ENDPOINTS.SPLASH_IMAGE(championId, num),
+        cachedOriginalPath: originalCached
+          ? cacheManager.getAssetPath(version, 'skin', splashFile, '1x')
+          : undefined,
+        cachedUpscaledPath: upscaled4xCached
+          ? cacheManager.getAssetPath(version, 'skin', splashFile, '4x')
+          : undefined,
+        upscaleStatus: upscaled4xCached ? 'ready' : 'none',
+      });
+    }
+
+    return skins;
+  }
+
+  /**
+   * Fetches the abilities (Passive, Q, W, E, R) for a specific champion.
+   */
+  public async getChampionAbilities(version: string, championId: string): Promise<AbilityAsset[]> {
+    const champData = await this.getRawChampionDetail(version, championId);
     const abilities: AbilityAsset[] = [];
 
     // 1. Passive

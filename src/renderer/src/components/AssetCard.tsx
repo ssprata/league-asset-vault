@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AnyAsset, ResolutionScale, MaskShape, SummonerSpellAsset, AbilityAsset } from '@shared/types';
+import { AnyAsset, ResolutionScale, MaskShape, SummonerSpellAsset, AbilityAsset, RuneAsset } from '@shared/types';
 import { Zap, Eye, Move, Bookmark, Copy, Check } from 'lucide-react';
 
 interface AssetCardProps {
@@ -37,6 +37,10 @@ export const AssetCard: React.FC<AssetCardProps> = ({
     if (asset.type === 'ability') {
       const ability = asset as AbilityAsset;
       return `[${ability.slot}] Ability`;
+    }
+    if (asset.type === 'rune') {
+      const rune = asset as RuneAsset;
+      return rune.slotType === 'keystone' ? `Keystone · ${rune.treeName}` : rune.treeName;
     }
     return '';
   };

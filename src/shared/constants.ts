@@ -12,6 +12,8 @@ export const DDRAGON_ENDPOINTS = {
     `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/item.json`,
   SUMMONER_DATA: (version: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/summoner.json`,
+  RUNES_DATA: (version: string) =>
+    `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/runesReforged.json`,
   CHAMPION_IMAGE: (version: string, filename: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${filename}`,
   ITEM_IMAGE: (version: string, filename: string) =>
@@ -20,6 +22,12 @@ export const DDRAGON_ENDPOINTS = {
     `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${filename}`,
   PASSIVE_IMAGE: (version: string, filename: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${filename}`,
+  RUNE_IMAGE: (iconPath: string) =>
+    `https://ddragon.leagueoflegends.com/cdn/img/${iconPath}`,
+  SPLASH_IMAGE: (id: string, num: number) =>
+    `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${id}_${num}.jpg`,
+  LOADING_IMAGE: (id: string, num: number) =>
+    `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${id}_${num}.jpg`,
 };
 
 export const IPC_CHANNELS = {
@@ -27,7 +35,9 @@ export const IPC_CHANNELS = {
   GET_CHAMPIONS: 'ddragon:get-champions',
   GET_ITEMS: 'ddragon:get-items',
   GET_SUMMONER_SPELLS: 'ddragon:get-summoner-spells',
+  GET_RUNES: 'ddragon:get-runes',
   GET_CHAMPION_ABILITIES: 'ddragon:get-champion-abilities',
+  GET_CHAMPION_SKINS: 'ddragon:get-champion-skins',
   ENSURE_ASSET_CACHED: 'cache:ensure-asset',
   START_DRAG: 'drag:start',
   CLIPBOARD_COPY: 'clipboard:copy-image',
@@ -86,3 +96,20 @@ export const ITEM_TAGS = [
   'Boots',
   'Consumable',
 ] as const;
+
+export const RUNE_TAGS = [
+  'All',
+  'Keystones',
+  'Precision',
+  'Domination',
+  'Sorcery',
+  'Resolve',
+  'Inspiration',
+] as const;
+
+export const FRAME_STYLES = [
+  { id: 'none', label: 'Clean', desc: 'Raw icon without additional frame' },
+  { id: 'gold_border', label: 'Hextech Gold', desc: 'Crisp metallic gold border' },
+  { id: 'drop_shadow', label: 'Drop Shadow', desc: 'Soft dark drop shadow for bright gameplay backgrounds' },
+] as const;
+

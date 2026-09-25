@@ -6,6 +6,7 @@ import {
   ChampionAsset,
   ItemAsset,
   SummonerSpellAsset,
+  RuneAsset,
   AnyAsset,
   CacheStats,
   UpscaleProgressPayload,
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
   const [champions, setChampions] = useState<ChampionAsset[]>([]);
   const [items, setItems] = useState<ItemAsset[]>([]);
   const [summoners, setSummoners] = useState<SummonerSpellAsset[]>([]);
+  const [runes, setRunes] = useState<RuneAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const [activeTab, setActiveTab] = useState<AssetType>('champion');
@@ -131,15 +133,17 @@ export const App: React.FC = () => {
   const loadDataForVersion = async (ver: string) => {
     setLoading(true);
     try {
-      const [champsData, itemsData, summonersData, stats] = await Promise.all([
+      const [champsData, itemsData, summonersData, runesData, stats] = await Promise.all([
         window.electronAPI.getChampions(ver),
         window.electronAPI.getItems(ver),
         window.electronAPI.getSummonerSpells(ver),
+        window.electronAPI.getRunes(ver),
         window.electronAPI.getCacheStats(),
       ]);
       setChampions(champsData);
       setItems(itemsData);
       setSummoners(summonersData);
+      setRunes(runesData);
       setCacheStats(stats);
     } catch (err) {
       console.error('Failed loading version data:', err);
@@ -171,6 +175,7 @@ export const App: React.FC = () => {
     let rawList: AnyAsset[] = champions;
     if (activeTab === 'item') rawList = items;
     else if (activeTab === 'summoner') rawList = summoners;
+    else if (activeTab === 'rune') rawList = runes;
 
     const query = searchQuery.trim().toLowerCase();
 
@@ -195,10 +200,16 @@ export const App: React.FC = () => {
         );
       } else if (asset.type === 'summoner') {
         return asset.description.toLowerCase().includes(query);
+      } else if (asset.type === 'rune') {
+        return (
+          asset.shortDesc.toLowerCase().includes(query) ||
+          asset.longDesc.toLowerCase().includes(query) ||
+          asset.treeName.toLowerCase().includes(query)
+        );
       }
       return false;
     });
-  }, [activeTab, champions, items, summoners, searchQuery, selectedTag]);
+  }, [activeTab, champions, items, summoners, runes, searchQuery, selectedTag]);
 
   // Batch upscale currently filtered assets
   const handleBatchUpscale = async () => {
@@ -264,6 +275,7 @@ export const App: React.FC = () => {
         championCount={champions.length}
         itemCount={items.length}
         summonerCount={summoners.length}
+        runeCount={runes.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedTag={selectedTag}

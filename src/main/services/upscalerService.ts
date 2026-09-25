@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { AnyAsset, ResolutionScale, DenoiseLevel, MaskShape, UpscaleProgressPayload } from '../../shared/types';
+import { AnyAsset, ResolutionScale, DenoiseLevel, MaskShape, FrameStyle, UpscaleProgressPayload } from '../../shared/types';
 import { cacheManager } from './cacheManager';
 import { ddragonService } from './ddragonService';
 import { runWaifu2x } from '../upscaler';
@@ -19,7 +19,8 @@ export class UpscalerService {
     asset: AnyAsset,
     scale: ResolutionScale,
     noiseLevel: DenoiseLevel = 3,
-    maskShape: MaskShape = 'square'
+    maskShape: MaskShape = 'square',
+    frameStyle: FrameStyle = 'none'
   ): Promise<string> {
     const targetPath = cacheManager.getAssetPath(
       version,
@@ -27,21 +28,23 @@ export class UpscalerService {
       asset.imageFileName,
       scale,
       noiseLevel,
-      maskShape
+      maskShape,
+      frameStyle
     );
 
     if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
       return targetPath;
     }
 
-    // Step 1: Ensure the square version exists
+    // Step 1: Ensure base clean square version exists
     let squarePath = cacheManager.getAssetPath(
       version,
       asset.type,
       asset.imageFileName,
       scale,
       noiseLevel,
-      'square'
+      'square',
+      'none'
     );
 
     if (!fs.existsSync(squarePath) || fs.statSync(squarePath).size === 0) {
@@ -70,13 +73,13 @@ export class UpscalerService {
       }
     }
 
-    // Step 2: If circle mask is requested, generate transparent circle cutout
-    if (maskShape === 'circle') {
+    // Step 2: If circle mask or framing is requested, apply styling
+    if (maskShape === 'circle' || frameStyle !== 'none') {
       try {
-        await AlphaMasker.maskFileToDisk(squarePath, targetPath);
+        await AlphaMasker.processFileToDisk(squarePath, targetPath, maskShape, frameStyle);
         return targetPath;
-      } catch (maskErr) {
-        console.error('[UpscalerService] Failed applying circle mask, using square:', maskErr);
+      } catch (styleErr) {
+        console.error('[UpscalerService] Failed applying shape/frame styling, using square:', styleErr);
         return squarePath;
       }
     }
