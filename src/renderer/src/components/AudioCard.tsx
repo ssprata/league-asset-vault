@@ -25,15 +25,6 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
     };
   }, []);
 
-  // Pre-cache remote audio in background so it is instantly available for dragging
-  useEffect(() => {
-    if (!isCached && asset.cdnUrl && !asset.cdnUrl.startsWith('data:')) {
-      window.electronAPI.ensureAudioCached(asset)
-        .then(() => setIsCached(true))
-        .catch(() => {});
-    }
-  }, [asset.id, isCached]);
-
   // Sync volume with global master volume in real-time
   useEffect(() => {
     if (audioRef.current) {
