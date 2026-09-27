@@ -128,11 +128,15 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
       await window.electronAPI.ensureAudioCached(asset);
       setIsCached(true);
 
-      // Trigger OS native CF_HDROP drag
+      const dragFileName = asset.fileName.endsWith('.wav')
+        ? asset.fileName
+        : `${asset.fileName.replace(/\.[^/.]+$/, '')}.wav`;
+
+      // Trigger OS native CF_HDROP drag directly into Premiere Pro or DaVinci Resolve
       await window.electronAPI.startDrag({
         assetId: asset.id,
         assetType: 'audio',
-        imageFileName: asset.fileName,
+        imageFileName: dragFileName,
         cdnUrl: asset.cdnUrl,
       });
     } catch (err) {

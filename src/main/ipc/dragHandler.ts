@@ -27,7 +27,10 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
 
       // Special Handling for Native Audio Files
       if (assetType === 'audio') {
-        const fileName = imageFileName || `${assetId}.ogg`;
+        const rawFileName = imageFileName || `${assetId}.wav`;
+        const fileName = rawFileName.endsWith('.wav')
+          ? rawFileName
+          : `${path.basename(rawFileName, path.extname(rawFileName))}.wav`;
         const cdnUrl = requestCdnUrl || '';
         const audioAsset: any = {
           type: 'audio',

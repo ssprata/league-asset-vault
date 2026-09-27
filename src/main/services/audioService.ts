@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { app } from 'electron';
 import { AudioAsset } from '../../shared/types';
 import { DDRAGON_ENDPOINTS } from '../../shared/constants';
@@ -57,18 +58,18 @@ export class AudioService {
       return `file://${filePath.replace(/\\/g, '/')}`;
     };
 
-    // 1. Authentic Summoner Spells SFX
+    // 1. Authentic Summoner Spells SFX (16-bit PCM Broadcast WAV)
     const spells = [
-      { id: 'flash_sfx', name: 'Flash SFX', file: 'flash.ogg', duration: '0:01' },
-      { id: 'ignite_sfx', name: 'Ignite SFX', file: 'ignite.ogg', duration: '0:01' },
-      { id: 'smite_sfx', name: 'Smite SFX', file: 'smite.ogg', duration: '0:01' },
-      { id: 'ghost_sfx', name: 'Ghost SFX', file: 'ghost.ogg', duration: '0:01' },
-      { id: 'cleanse_sfx', name: 'Cleanse SFX', file: 'cleanse.ogg', duration: '0:02' },
-      { id: 'heal_sfx', name: 'Heal SFX', file: 'heal.ogg', duration: '0:02' },
-      { id: 'teleport_sfx', name: 'Teleport SFX', file: 'teleport.ogg', duration: '0:03' },
-      { id: 'barrier_sfx', name: 'Barrier SFX', file: 'barrier.ogg', duration: '0:01' },
-      { id: 'exhaust_sfx', name: 'Exhaust SFX', file: 'exhaust.ogg', duration: '0:01' },
-      { id: 'recall_sfx', name: 'Recall SFX', file: 'recall.ogg', duration: '0:08' },
+      { id: 'flash_sfx', name: 'Flash SFX', file: 'flash.wav', duration: '0:01' },
+      { id: 'ignite_sfx', name: 'Ignite SFX', file: 'ignite.wav', duration: '0:01' },
+      { id: 'smite_sfx', name: 'Smite SFX', file: 'smite.wav', duration: '0:01' },
+      { id: 'ghost_sfx', name: 'Ghost SFX', file: 'ghost.wav', duration: '0:01' },
+      { id: 'cleanse_sfx', name: 'Cleanse SFX', file: 'cleanse.wav', duration: '0:02' },
+      { id: 'heal_sfx', name: 'Heal SFX', file: 'heal.wav', duration: '0:02' },
+      { id: 'teleport_sfx', name: 'Teleport SFX', file: 'teleport.wav', duration: '0:03' },
+      { id: 'barrier_sfx', name: 'Barrier SFX', file: 'barrier.wav', duration: '0:01' },
+      { id: 'exhaust_sfx', name: 'Exhaust SFX', file: 'exhaust.wav', duration: '0:01' },
+      { id: 'recall_sfx', name: 'Recall SFX', file: 'recall.wav', duration: '0:08' },
     ];
 
     for (const s of spells) {
@@ -88,14 +89,14 @@ export class AudioService {
       });
     }
 
-    // 2. Authentic Game Items SFX
+    // 2. Authentic Game Items SFX (16-bit PCM Broadcast WAV)
     const items = [
-      { id: 'zhonya_sfx', name: "Zhonya's Hourglass Stasis SFX", file: 'zhonya.ogg', duration: '0:02' },
-      { id: 'guardian_angel_sfx', name: 'Guardian Angel Revive SFX', file: 'guardian_angel.ogg', duration: '0:04' },
-      { id: 'blade_ruined_king_sfx', name: 'Blade of the Ruined King SFX', file: 'blade_of_the_ruined_king.ogg', duration: '0:02' },
-      { id: 'heartsteel_sfx', name: 'Heartsteel Trigger SFX', file: 'heartsteel.ogg', duration: '0:01' },
-      { id: 'redemption_sfx', name: 'Redemption Active SFX', file: 'redemption.ogg', duration: '0:02' },
-      { id: 'locket_solari_sfx', name: 'Locket of the Iron Solari SFX', file: 'locket_solari.ogg', duration: '0:02' },
+      { id: 'zhonya_sfx', name: "Zhonya's Hourglass Stasis SFX", file: 'zhonya.wav', duration: '0:02' },
+      { id: 'guardian_angel_sfx', name: 'Guardian Angel Revive SFX', file: 'guardian_angel.wav', duration: '0:04' },
+      { id: 'blade_ruined_king_sfx', name: 'Blade of the Ruined King SFX', file: 'blade_of_the_ruined_king.wav', duration: '0:02' },
+      { id: 'heartsteel_sfx', name: 'Heartsteel Trigger SFX', file: 'heartsteel.wav', duration: '0:01' },
+      { id: 'redemption_sfx', name: 'Redemption Active SFX', file: 'redemption.wav', duration: '0:02' },
+      { id: 'locket_solari_sfx', name: 'Locket of the Iron Solari SFX', file: 'locket_solari.wav', duration: '0:02' },
     ];
 
     for (const it of items) {
@@ -115,15 +116,15 @@ export class AudioService {
       });
     }
 
-    // 3. Authentic Smart Pings SFX
+    // 3. Authentic Smart Pings SFX (16-bit PCM Broadcast WAV)
     const pings = [
-      { id: 'ping_danger', name: 'Danger / Caution Alert Ping', file: 'ping_danger.ogg', duration: '0:01' },
-      { id: 'ping_missing', name: 'Enemy Missing (?) Ping', file: 'ping_missing.ogg', duration: '0:01' },
-      { id: 'ping_assist', name: 'Assist Me Ping', file: 'ping_assist.ogg', duration: '0:01' },
-      { id: 'ping_onmyway', name: 'On My Way Ping', file: 'ping_onmyway.ogg', duration: '0:01' },
-      { id: 'ping_allin', name: 'All In Ping', file: 'ping_allin.ogg', duration: '0:01' },
-      { id: 'ping_retreat', name: 'Retreat / Fall Back Ping', file: 'ping_retreat.ogg', duration: '0:01' },
-      { id: 'ping_needvision', name: 'Need Vision Ping', file: 'ping_needvision.ogg', duration: '0:01' },
+      { id: 'ping_danger', name: 'Danger / Caution Alert Ping', file: 'ping_danger.wav', duration: '0:01' },
+      { id: 'ping_missing', name: 'Enemy Missing (?) Ping', file: 'ping_missing.wav', duration: '0:01' },
+      { id: 'ping_assist', name: 'Assist Me Ping', file: 'ping_assist.wav', duration: '0:01' },
+      { id: 'ping_onmyway', name: 'On My Way Ping', file: 'ping_onmyway.wav', duration: '0:01' },
+      { id: 'ping_allin', name: 'All In Ping', file: 'ping_allin.wav', duration: '0:01' },
+      { id: 'ping_retreat', name: 'Retreat / Fall Back Ping', file: 'ping_retreat.wav', duration: '0:01' },
+      { id: 'ping_needvision', name: 'Need Vision Ping', file: 'ping_needvision.wav', duration: '0:01' },
     ];
 
     for (const p of pings) {
@@ -145,26 +146,26 @@ export class AudioService {
 
     // 4. Authentic Classic Female Announcer Lines (Karen Strassman / Summoner's Rift)
     const announcer = [
-      { id: 'announcer_welcome', name: "Welcome to Summoner's Rift", file: 'announcer_welcome.ogg', duration: '0:03' },
-      { id: 'announcer_minions', name: 'Thirty Seconds Until Minions Spawn', file: 'announcer_minions.ogg', duration: '0:03' },
-      { id: 'announcer_minions_spawned', name: 'Minions Have Spawned', file: 'announcer_minions_spawned.ogg', duration: '0:02' },
-      { id: 'announcer_first_blood', name: 'First Blood Announcement', file: 'announcer_first_blood.ogg', duration: '0:02' },
-      { id: 'announcer_enemy_slain', name: 'An Enemy Has Been Slain', file: 'announcer_enemy_slain.ogg', duration: '0:02' },
-      { id: 'announcer_double_kill', name: 'Double Kill Announcement', file: 'announcer_double_kill.ogg', duration: '0:02' },
-      { id: 'announcer_triple_kill', name: 'Triple Kill Announcement', file: 'announcer_triple_kill.ogg', duration: '0:02' },
-      { id: 'announcer_quadra_kill', name: 'Quadra Kill Announcement', file: 'announcer_quadra_kill.ogg', duration: '0:02' },
-      { id: 'announcer_penta_kill', name: 'Pentakill! Announcement', file: 'announcer_penta_kill.ogg', duration: '0:02' },
-      { id: 'announcer_ace', name: 'Ace! Announcement', file: 'announcer_ace.ogg', duration: '0:02' },
-      { id: 'announcer_executed', name: 'Executed Announcement', file: 'announcer_executed.ogg', duration: '0:01' },
-      { id: 'announcer_shutdown', name: 'Shutdown! Announcement', file: 'announcer_shutdown.ogg', duration: '0:02' },
-      { id: 'announcer_killing_spree', name: 'Killing Spree Announcement', file: 'announcer_killing_spree.ogg', duration: '0:02' },
-      { id: 'announcer_rampage', name: 'Rampage! Announcement', file: 'announcer_rampage.ogg', duration: '0:02' },
-      { id: 'announcer_unstoppable', name: 'Unstoppable! Announcement', file: 'announcer_unstoppable.ogg', duration: '0:02' },
-      { id: 'announcer_godlike', name: 'Godlike! Announcement', file: 'announcer_godlike.ogg', duration: '0:02' },
-      { id: 'announcer_legendary', name: 'Legendary! Announcement', file: 'announcer_legendary.ogg', duration: '0:02' },
-      { id: 'announcer_turret_destroyed', name: 'Your Team Has Destroyed a Turret', file: 'announcer_turret_destroyed.ogg', duration: '0:03' },
-      { id: 'announcer_victory', name: 'Victory Announcement', file: 'announcer_victory.ogg', duration: '0:02' },
-      { id: 'announcer_defeat', name: 'Defeat Announcement', file: 'announcer_defeat.ogg', duration: '0:02' },
+      { id: 'announcer_welcome', name: "Welcome to Summoner's Rift", file: 'announcer_welcome.wav', duration: '0:03' },
+      { id: 'announcer_minions', name: 'Thirty Seconds Until Minions Spawn', file: 'announcer_minions.wav', duration: '0:03' },
+      { id: 'announcer_minions_spawned', name: 'Minions Have Spawned', file: 'announcer_minions_spawned.wav', duration: '0:02' },
+      { id: 'announcer_first_blood', name: 'First Blood Announcement', file: 'announcer_first_blood.wav', duration: '0:02' },
+      { id: 'announcer_enemy_slain', name: 'An Enemy Has Been Slain', file: 'announcer_enemy_slain.wav', duration: '0:02' },
+      { id: 'announcer_double_kill', name: 'Double Kill Announcement', file: 'announcer_double_kill.wav', duration: '0:02' },
+      { id: 'announcer_triple_kill', name: 'Triple Kill Announcement', file: 'announcer_triple_kill.wav', duration: '0:02' },
+      { id: 'announcer_quadra_kill', name: 'Quadra Kill Announcement', file: 'announcer_quadra_kill.wav', duration: '0:02' },
+      { id: 'announcer_penta_kill', name: 'Pentakill! Announcement', file: 'announcer_penta_kill.wav', duration: '0:02' },
+      { id: 'announcer_ace', name: 'Ace! Announcement', file: 'announcer_ace.wav', duration: '0:02' },
+      { id: 'announcer_executed', name: 'Executed Announcement', file: 'announcer_executed.wav', duration: '0:01' },
+      { id: 'announcer_shutdown', name: 'Shutdown! Announcement', file: 'announcer_shutdown.wav', duration: '0:02' },
+      { id: 'announcer_killing_spree', name: 'Killing Spree Announcement', file: 'announcer_killing_spree.wav', duration: '0:02' },
+      { id: 'announcer_rampage', name: 'Rampage! Announcement', file: 'announcer_rampage.wav', duration: '0:02' },
+      { id: 'announcer_unstoppable', name: 'Unstoppable! Announcement', file: 'announcer_unstoppable.wav', duration: '0:02' },
+      { id: 'announcer_godlike', name: 'Godlike! Announcement', file: 'announcer_godlike.wav', duration: '0:02' },
+      { id: 'announcer_legendary', name: 'Legendary! Announcement', file: 'announcer_legendary.wav', duration: '0:02' },
+      { id: 'announcer_turret_destroyed', name: 'Your Team Has Destroyed a Turret', file: 'announcer_turret_destroyed.wav', duration: '0:03' },
+      { id: 'announcer_victory', name: 'Victory Announcement', file: 'announcer_victory.wav', duration: '0:02' },
+      { id: 'announcer_defeat', name: 'Defeat Announcement', file: 'announcer_defeat.wav', duration: '0:02' },
     ];
 
     for (const a of announcer) {
@@ -184,7 +185,7 @@ export class AudioService {
       });
     }
 
-    // 5. Champion Choose VO, Ban VO, and Signature Stinger SFX
+    // 5. Champion Choose VO, Ban VO, and Signature Stinger SFX (PCM Broadcast WAV)
     try {
       const champions = await ddragonService.getChampions(version);
       const audioCacheDir = this.getAudioCacheDir();
@@ -194,7 +195,7 @@ export class AudioService {
         const champName = champ.name;
 
         // Choose VO
-        const chooseFile = `${champKey}_choose.ogg`;
+        const chooseFile = `${champKey}_choose.wav`;
         const chooseLocal = path.join(audioCacheDir, chooseFile);
         list.push({
           type: 'audio',
@@ -211,7 +212,7 @@ export class AudioService {
         });
 
         // Ban VO
-        const banFile = `${champKey}_ban.ogg`;
+        const banFile = `${champKey}_ban.wav`;
         const banLocal = path.join(audioCacheDir, banFile);
         list.push({
           type: 'audio',
@@ -228,7 +229,7 @@ export class AudioService {
         });
 
         // Signature SFX Stinger
-        const sfxFile = `${champKey}_sfx.ogg`;
+        const sfxFile = `${champKey}_sfx.wav`;
         const sfxLocal = path.join(audioCacheDir, sfxFile);
         list.push({
           type: 'audio',
@@ -257,13 +258,13 @@ export class AudioService {
   public async getChampionAudio(championKey: string, championName: string): Promise<AudioAsset[]> {
     const audioCacheDir = this.getAudioCacheDir();
 
-    const chooseFile = `${championKey}_choose.ogg`;
+    const chooseFile = `${championKey}_choose.wav`;
     const chooseLocal = path.join(audioCacheDir, chooseFile);
 
-    const banFile = `${championKey}_ban.ogg`;
+    const banFile = `${championKey}_ban.wav`;
     const banLocal = path.join(audioCacheDir, banFile);
 
-    const sfxFile = `${championKey}_sfx.ogg`;
+    const sfxFile = `${championKey}_sfx.wav`;
     const sfxLocal = path.join(audioCacheDir, sfxFile);
 
     return [
@@ -336,11 +337,16 @@ export class AudioService {
   }
 
   /**
-   * Ensures an audio asset is saved to local disk cache and returns the absolute file path.
+   * Ensures an audio asset is saved to local disk cache as a 16-bit PCM .wav file for Premiere Pro compatibility.
    */
   public async ensureAudioCached(asset: AudioAsset): Promise<string> {
+    const rawName = asset.fileName || `${asset.id}.wav`;
+    const wavFileName = rawName.endsWith('.wav')
+      ? rawName
+      : `${path.basename(rawName, path.extname(rawName))}.wav`;
+
     // 1. Check if bundled sound file in resources/sounds
-    const inBundled = path.join(this.bundledSoundsDir, asset.fileName);
+    const inBundled = path.join(this.bundledSoundsDir, wavFileName);
     if (fs.existsSync(inBundled) && fs.statSync(inBundled).size > 0) {
       return inBundled;
     }
@@ -354,11 +360,11 @@ export class AudioService {
       }
     }
 
-    // 3. Check if already in audio cache
+    // 3. Check if already in audio cache as .wav
     const cacheDir = this.getAudioCacheDir();
-    const targetPath = path.join(cacheDir, asset.fileName);
-    if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
-      return targetPath;
+    const targetWavPath = path.join(cacheDir, wavFileName);
+    if (fs.existsSync(targetWavPath) && fs.statSync(targetWavPath).size > 0) {
+      return targetWavPath;
     }
 
     // 4. Download from CDN
@@ -377,9 +383,31 @@ export class AudioService {
     }
 
     const arrayBuf = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
-    await fs.promises.writeFile(targetPath, buffer);
-    return targetPath;
+    const downloadedBuf = Buffer.from(arrayBuf);
+
+    // If already a WAV file (starts with 'RIFF')
+    if (downloadedBuf.slice(0, 4).toString('ascii') === 'RIFF') {
+      await fs.promises.writeFile(targetWavPath, downloadedBuf);
+      return targetWavPath;
+    }
+
+    // Convert OGG or other source formats to uncompressed 16-bit 44.1kHz stereo PCM WAV using ffmpeg
+    const tempInput = path.join(cacheDir, `temp_${Date.now()}_${path.basename(asset.fileName, '.wav')}.ogg`);
+    try {
+      await fs.promises.writeFile(tempInput, downloadedBuf);
+      try {
+        execSync(`ffmpeg -y -i "${tempInput}" -acodec pcm_s16le -ar 44100 "${targetWavPath}"`, { stdio: 'pipe' });
+      } catch (convErr) {
+        console.warn('[AudioService] ffmpeg conversion failed, saving downloaded buffer directly:', convErr);
+        await fs.promises.writeFile(targetWavPath, downloadedBuf);
+      }
+    } finally {
+      if (fs.existsSync(tempInput)) {
+        try { fs.unlinkSync(tempInput); } catch (_) {}
+      }
+    }
+
+    return targetWavPath;
   }
 }
 

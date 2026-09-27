@@ -64,7 +64,7 @@ export class CacheManager {
 
     let rawId = path.basename(fileName, path.extname(fileName));
     if (type === 'audio') {
-      const ext = path.extname(fileName) || '.ogg';
+      const ext = path.extname(fileName) || '.wav';
       return path.join(targetDir, `${rawId}${ext}`);
     }
 
