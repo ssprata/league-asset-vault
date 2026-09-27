@@ -12,7 +12,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState('0:00');
   const [isCached, setIsCached] = useState(!!asset.cachedPath);
-  const [downloading, setDownloading] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Clean up audio on unmount
@@ -24,6 +24,15 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
       }
     };
   }, []);
+
+  // Pre-cache remote audio in background so it is instantly available for dragging
+  useEffect(() => {
+    if (!isCached && asset.cdnUrl && !asset.cdnUrl.startsWith('data:')) {
+      window.electronAPI.ensureAudioCached(asset)
+        .then(() => setIsCached(true))
+        .catch(() => {});
+    }
+  }, [asset.id, isCached]);
 
   // Sync volume with global master volume in real-time
   useEffect(() => {
@@ -120,30 +129,21 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
     }
   };
 
-  const handleDragStart = async (e: React.DragEvent) => {
+  const handleDragStart = (e: React.DragEvent) => {
+    // Crucial for native OS file drag: prevent browser default HTML dragging
     e.preventDefault();
-    try {
-      setDownloading(true);
-      // Ensure audio is cached locally before drag initiation
-      await window.electronAPI.ensureAudioCached(asset);
-      setIsCached(true);
 
-      const dragFileName = asset.fileName.endsWith('.wav')
-        ? asset.fileName
-        : `${asset.fileName.replace(/\.[^/.]+$/, '')}.wav`;
+    const dragFileName = asset.fileName.endsWith('.wav')
+      ? asset.fileName
+      : `${asset.fileName.replace(/\.[^/.]+$/, '')}.wav`;
 
-      // Trigger OS native CF_HDROP drag directly into Premiere Pro or DaVinci Resolve
-      await window.electronAPI.startDrag({
-        assetId: asset.id,
-        assetType: 'audio',
-        imageFileName: dragFileName,
-        cdnUrl: asset.cdnUrl,
-      });
-    } catch (err) {
-      console.error('Drag error:', err);
-    } finally {
-      setDownloading(false);
-    }
+    // Trigger OS native CF_HDROP drag synchronously
+    window.electronAPI.startDrag({
+      assetId: asset.id,
+      assetType: 'audio',
+      imageFileName: dragFileName,
+      cdnUrl: asset.cdnUrl,
+    });
   };
 
   const getCategoryBadge = () => {
@@ -169,7 +169,11 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
 
   return (
     <div
-      className="glass-panel"
+      className="glass-panel card-draggable"
+      draggable="true"
+      onDragStart={handleDragStart}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         borderRadius: 10,
         padding: '14px 16px',
@@ -178,10 +182,21 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
         gap: 12,
         background: isPlaying
           ? 'linear-gradient(135deg, rgba(15, 25, 48, 0.95) 0%, rgba(8, 14, 28, 0.95) 100%)'
+          : isHovered
+          ? 'rgba(15, 25, 48, 0.90)'
           : 'rgba(10, 17, 34, 0.85)',
-        border: isPlaying ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
-        boxShadow: isPlaying ? '0 0 20px rgba(200, 170, 110, 0.25)' : 'none',
+        border: isPlaying
+          ? '1px solid var(--gold-primary)'
+          : isHovered
+          ? '1px solid var(--border-gold-bright)'
+          : '1px solid var(--border-subtle)',
+        boxShadow: isPlaying
+          ? '0 0 20px rgba(200, 170, 110, 0.25)'
+          : isHovered
+          ? '0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(200, 170, 110, 0.15)'
+          : 'none',
         transition: 'all 0.2s ease',
+        userSelect: 'none',
       }}
     >
       {/* Top Header: Badge, Title & Format */}
@@ -303,6 +318,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
         {/* Play / Pause Button */}
         <button
           onClick={handlePlayToggle}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             flex: 1,
             background: isPlaying
@@ -328,13 +344,13 @@ export const AudioCard: React.FC<AudioCardProps> = ({ asset, volume = 0.30 }) =>
 
         {/* Win32 CF_HDROP Native Drag Handle */}
         <div
-          draggable
+          draggable="true"
           onDragStart={handleDragStart}
-          className="btn-hextech"
+          className="btn-hextech card-draggable"
           style={{
             padding: '7px 12px',
             fontSize: '0.74rem',
-            cursor: downloading ? 'wait' : 'grab',
+            cursor: 'grab',
             display: 'flex',
             alignItems: 'center',
             gap: 6,

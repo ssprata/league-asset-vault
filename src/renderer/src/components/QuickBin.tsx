@@ -42,6 +42,19 @@ export const QuickBin: React.FC<QuickBinProps> = ({
 
   const handleDragStart = (e: React.DragEvent, asset: AnyAsset) => {
     e.preventDefault();
+    if (asset.type === 'audio') {
+      const audio = asset as any;
+      const dragFileName = audio.fileName.endsWith('.wav')
+        ? audio.fileName
+        : `${audio.fileName.replace(/\.[^/.]+$/, '')}.wav`;
+      window.electronAPI.startDrag({
+        assetId: audio.id,
+        assetType: 'audio',
+        imageFileName: dragFileName,
+        cdnUrl: audio.cdnUrl,
+      });
+      return;
+    }
     window.electronAPI.startDrag({
       assetId: asset.id,
       assetType: asset.type,
@@ -49,7 +62,7 @@ export const QuickBin: React.FC<QuickBinProps> = ({
       maskShape,
       stampBadge,
       badgeText: getBadgeText(asset),
-      imageFileName: asset.imageFileName,
+      imageFileName: (asset as any).imageFileName,
       cdnUrl: asset.cdnUrl,
     });
   };

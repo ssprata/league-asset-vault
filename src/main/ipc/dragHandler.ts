@@ -8,6 +8,11 @@ import { ddragonService } from '../services/ddragonService';
 import { upscalerService } from '../services/upscalerService';
 import { audioService } from '../services/audioService';
 
+// 64x64 Hextech gold audio waveform icon for Windows native drag cursor feedback
+const AUDIO_DRAG_ICON = nativeImage.createFromDataURL(
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABaElEQVR4AeXBsXXCMBiF0U//UeVGeAOPkVoDqMwK6hgmnVag1ACqGYMNsBpaQuGCIjlpwJi8ex1/OB72V97cx+eX4xeOHwzjNPNPXc6nHXccd4ZxmhFxOZ923DgWwzjNiLmcTztDnONmGKcZQa2kYIgzxNnxsL8izBBniDPEGeIMcYY4Q5whzhBniPO8SCspsIi5dl7EEOd5klZSYBFz7WyUZ6NaSYFFzLXzJIY4z0paSYFFzLWzEZ6NaCUFFjHXzkqMB2klhVZSaCUFVtBKCjyA5020kgKLmGvnQQxxhjhDnCHOEGeIM8QZ4gxxhjjPm4i5dp7A8yAx186KYq6dB/BsRMy18wKelcRcOxtkiPNsVMy1swLPk8RcO2/AEOd5kZhrZwMMcYY4Q5whzhBniDPEGeIMcYY4x80wTjOCWknBEGeIcyyGcZoRczmfdoY4x51hnGZEXM6nHTeOHxwP+yv/1Mfnl+PON72/Vl8jOMj8AAAAAElFTkSuQmCC'
+);
+
 export function registerDragHandler(currentVersionGetter: () => string): void {
   ipcMain.on(IPC_CHANNELS.START_DRAG, async (event, request: DragStartRequest) => {
     try {
@@ -40,13 +45,25 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
           cdnUrl,
         };
 
-        const targetAudioPath = await audioService.ensureAudioCached(audioAsset);
+        // Check synchronously if file is already on disk (bundled in resources or cached)
+        const bundledCandidate = path.join(audioService.getBundledDir(), fileName);
+        const cacheCandidate = path.join(audioService.getAudioCacheDir(), fileName);
+
+        let targetAudioPath = '';
+        if (fs.existsSync(bundledCandidate) && fs.statSync(bundledCandidate).size > 0) {
+          targetAudioPath = bundledCandidate;
+        } else if (fs.existsSync(cacheCandidate) && fs.statSync(cacheCandidate).size > 0) {
+          targetAudioPath = cacheCandidate;
+        } else {
+          targetAudioPath = await audioService.ensureAudioCached(audioAsset);
+        }
+
         const absoluteAudioPath = path.resolve(targetAudioPath);
 
-        // Native drag with CF_HDROP payload directly into Premiere Pro or DaVinci Resolve
+        // Native Win32 DoDragDrop with CF_HDROP payload and valid drag icon thumbnail
         event.sender.startDrag({
           file: absoluteAudioPath,
-          icon: nativeImage.createEmpty(),
+          icon: AUDIO_DRAG_ICON,
         });
 
         console.log(`[DragHandler] Initiated native audio CF_HDROP drag payload: ${absoluteAudioPath}`);
