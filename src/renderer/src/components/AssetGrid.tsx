@@ -7,6 +7,7 @@ interface AssetGridProps {
   assets: AnyAsset[];
   scale: ResolutionScale;
   maskShape?: MaskShape;
+  stampBadge?: boolean;
   pinnedIds?: Set<string>;
   onTogglePin?: (asset: AnyAsset) => void;
   onPreview: (asset: AnyAsset) => void;
@@ -17,6 +18,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   assets,
   scale,
   maskShape = 'square',
+  stampBadge,
   pinnedIds,
   onTogglePin,
   onPreview,
@@ -91,6 +93,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
             asset={asset}
             scale={scale}
             maskShape={maskShape}
+            stampBadge={stampBadge}
             isPinned={pinnedIds?.has(asset.id)}
             onTogglePin={onTogglePin}
             onPreview={onPreview}

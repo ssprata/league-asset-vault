@@ -15,6 +15,8 @@ import {
   HardDrive,
   Circle,
   Square,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -25,6 +27,8 @@ interface SettingsModalProps {
   onOpenCacheFolder: () => void;
   onClearCache: () => Promise<void>;
   currentVersion: string;
+  masterVolume?: number;
+  onMasterVolumeChange?: (vol: number) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -35,6 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenCacheFolder,
   onClearCache,
   currentVersion,
+  masterVolume = 0.30,
+  onMasterVolumeChange,
 }) => {
   const [settings, setSettings] = useState<AppSettings>({
     gpuId: 0,
@@ -42,6 +48,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     defaultDenoise: 3,
     defaultScale: '4x',
     defaultMaskShape: 'square',
+    defaultStampBadge: false,
   });
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -292,7 +299,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {/* Default Denoise */}
             <div>
               <label style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
@@ -370,8 +377,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <option value="circle">Circular Alpha Mask</option>
               </select>
             </div>
+
+            {/* Default Corner Badge Stamping */}
+            <div>
+              <label style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                Corner Badge Stamping
+              </label>
+              <select
+                value={settings.defaultStampBadge ? 'on' : 'off'}
+                onChange={(e) => setSettings({ ...settings, defaultStampBadge: e.target.value === 'on' })}
+                style={{
+                  width: '100%',
+                  background: 'rgba(10, 17, 32, 0.9)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 6,
+                  color: 'var(--text-primary)',
+                  padding: '7px 10px',
+                  fontSize: '0.78rem',
+                  outline: 'none',
+                }}
+              >
+                <option value="off">Off (Clean Icon)</option>
+                <option value="on">On (Stamp Q/W/E/R & Gold)</option>
+              </select>
+            </div>
           </div>
         </div>
+
+        {/* Section: Master Audio Volume */}
+        {onMasterVolumeChange && (
+          <div
+            style={{
+              background: 'rgba(5, 8, 17, 0.75)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 8,
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Volume2 size={16} color="var(--gold-primary)" />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--gold-light)' }}>
+                  GLOBAL AUDIO & SFX VOLUME
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: masterVolume === 0 ? '#ef4444' : 'var(--gold-light)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {masterVolume === 0 ? 'Muted (0%)' : `${Math.round(masterVolume * 100)}%`}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <input
+                type="range"
+                className="hextech-slider"
+                min="0"
+                max="100"
+                step="1"
+                value={Math.round(masterVolume * 100)}
+                onChange={(e) => onMasterVolumeChange(Number(e.target.value) / 100)}
+                style={{
+                  flex: 1,
+                  background: `linear-gradient(to right, var(--gold-primary) 0%, var(--gold-primary) ${masterVolume * 100}%, rgba(255, 255, 255, 0.12) ${masterVolume * 100}%, rgba(255, 255, 255, 0.12) 100%)`,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => onMasterVolumeChange(masterVolume === 0 ? 0.30 : 0)}
+                className="btn-hextech"
+                style={{ fontSize: '0.72rem', padding: '4px 10px' }}
+              >
+                {masterVolume === 0 ? 'Unmute' : 'Mute'}
+              </button>
+            </div>
+
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              Universally controls the volume of all League sound effects, announcer lines, item actives, and spell stingers.
+            </span>
+          </div>
+        )}
 
         {/* Section 3: Full Offline Pre-Caching */}
         <div

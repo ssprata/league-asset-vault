@@ -7,6 +7,7 @@ import {
   ItemAsset,
   SummonerSpellAsset,
   RuneAsset,
+  AudioAsset,
   AnyAsset,
   CacheStats,
   UpscaleProgressPayload,
@@ -14,13 +15,16 @@ import {
 import { Header } from './components/Header';
 import { SearchFilter } from './components/SearchFilter';
 import { AssetGrid } from './components/AssetGrid';
+import { AudioGrid } from './components/AudioGrid';
 import { PreviewModal } from './components/PreviewModal';
 import { StatusBar } from './components/StatusBar';
 import { QuickBin } from './components/QuickBin';
 import { SettingsModal } from './components/SettingsModal';
+import { matchAssetWithAliases } from '@shared/aliases';
 import { Loader2 } from 'lucide-react';
 
 const QUICKBIN_STORAGE_KEY = 'league-asset-vault:quickbin';
+const MASTER_VOLUME_STORAGE_KEY = 'league-asset-vault:master-volume';
 
 export const App: React.FC = () => {
   const [versions, setVersions] = useState<string[]>([]);
@@ -29,13 +33,42 @@ export const App: React.FC = () => {
   const [items, setItems] = useState<ItemAsset[]>([]);
   const [summoners, setSummoners] = useState<SummonerSpellAsset[]>([]);
   const [runes, setRunes] = useState<RuneAsset[]>([]);
+  const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Global Master Volume state (default 30% / 0.30)
+  const [masterVolume, setMasterVolume] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(MASTER_VOLUME_STORAGE_KEY);
+      if (stored !== null) {
+        const val = parseFloat(stored);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          return val;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed reading master volume from localStorage:', e);
+    }
+    return 0.30;
+  });
+
+  const handleMasterVolumeChange = (vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    setMasterVolume(clamped);
+    try {
+      localStorage.setItem(MASTER_VOLUME_STORAGE_KEY, clamped.toString());
+    } catch (e) {
+      console.warn('Failed saving master volume to localStorage:', e);
+    }
+    window.dispatchEvent(new CustomEvent('vault:volume-change', { detail: clamped }));
+  };
 
   const [activeTab, setActiveTab] = useState<AssetType>('champion');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [scale, setScale] = useState<ResolutionScale>('1x');
   const [maskShape, setMaskShape] = useState<MaskShape>('square');
+  const [stampBadge, setStampBadge] = useState<boolean>(false);
 
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [progress, setProgress] = useState<UpscaleProgressPayload | null>(null);
@@ -98,6 +131,7 @@ export const App: React.FC = () => {
           const s = await window.electronAPI.getSettings();
           if (s.defaultScale) setScale(s.defaultScale);
           if (s.defaultMaskShape) setMaskShape(s.defaultMaskShape);
+          if (s.defaultStampBadge !== undefined) setStampBadge(s.defaultStampBadge);
         } catch (err) {
           console.warn('Could not read default settings:', err);
         }
@@ -133,17 +167,19 @@ export const App: React.FC = () => {
   const loadDataForVersion = async (ver: string) => {
     setLoading(true);
     try {
-      const [champsData, itemsData, summonersData, runesData, stats] = await Promise.all([
+      const [champsData, itemsData, summonersData, runesData, audioData, stats] = await Promise.all([
         window.electronAPI.getChampions(ver),
         window.electronAPI.getItems(ver),
         window.electronAPI.getSummonerSpells(ver),
         window.electronAPI.getRunes(ver),
+        window.electronAPI.getAudioAssets(ver),
         window.electronAPI.getCacheStats(),
       ]);
       setChampions(champsData);
       setItems(itemsData);
       setSummoners(summonersData);
       setRunes(runesData);
+      setAudioAssets(audioData);
       setCacheStats(stats);
     } catch (err) {
       console.error('Failed loading version data:', err);
@@ -176,40 +212,35 @@ export const App: React.FC = () => {
     if (activeTab === 'item') rawList = items;
     else if (activeTab === 'summoner') rawList = summoners;
     else if (activeTab === 'rune') rawList = runes;
+    else if (activeTab === 'audio') rawList = audioAssets;
 
     const query = searchQuery.trim().toLowerCase();
 
     return rawList.filter((asset) => {
       // Tag filter
       if (selectedTag !== 'All') {
-        if (!asset.tags || !asset.tags.includes(selectedTag)) return false;
+        if (asset.type === 'audio') {
+          const audio = asset as AudioAsset;
+          const hasTag = audio.tags && audio.tags.some((t) => t.toLowerCase() === selectedTag.toLowerCase());
+          const cat = (audio.category || '').toLowerCase();
+          const matchCat =
+            (selectedTag === 'Spells' && cat === 'spell') ||
+            (selectedTag === 'Items' && cat === 'item') ||
+            (selectedTag === 'Pings' && cat === 'ping') ||
+            (selectedTag === 'Announcer' && cat === 'announcer') ||
+            (selectedTag === 'Voice Lines' &&
+              (cat === 'champion_vo' || cat === 'champion_sfx' || cat === 'vo' || cat === 'sfx'));
+          if (!hasTag && !matchCat) return false;
+        } else {
+          if (!asset.tags || !asset.tags.includes(selectedTag)) return false;
+        }
       }
 
-      // Search query filter
+      // Search query filter using aliases
       if (!query) return true;
-
-      const nameMatch = asset.name.toLowerCase().includes(query);
-      if (nameMatch) return true;
-
-      if (asset.type === 'champion') {
-        return asset.title.toLowerCase().includes(query);
-      } else if (asset.type === 'item') {
-        return (
-          asset.plaintext.toLowerCase().includes(query) ||
-          asset.description.toLowerCase().includes(query)
-        );
-      } else if (asset.type === 'summoner') {
-        return asset.description.toLowerCase().includes(query);
-      } else if (asset.type === 'rune') {
-        return (
-          asset.shortDesc.toLowerCase().includes(query) ||
-          asset.longDesc.toLowerCase().includes(query) ||
-          asset.treeName.toLowerCase().includes(query)
-        );
-      }
-      return false;
+      return matchAssetWithAliases(asset, query);
     });
-  }, [activeTab, champions, items, summoners, runes, searchQuery, selectedTag]);
+  }, [activeTab, champions, items, summoners, runes, audioAssets, searchQuery, selectedTag]);
 
   // Batch upscale currently filtered assets
   const handleBatchUpscale = async () => {
@@ -227,7 +258,23 @@ export const App: React.FC = () => {
 
   // Single asset upscale from card or modal
   const handleUpscaleSingle = async (asset: AnyAsset, targetScale: ResolutionScale) => {
-    const resPath = await window.electronAPI.upscaleAsset(asset, targetScale, 3, maskShape);
+    let badgeText: string | undefined;
+    if (asset.type === 'ability') {
+      const slot = (asset as any).slot;
+      badgeText = slot === 'Passive' ? 'P' : slot;
+    } else if (asset.type === 'item') {
+      const gold = (asset as any).goldTotal;
+      badgeText = gold !== undefined ? `${gold}g` : undefined;
+    }
+    const resPath = await window.electronAPI.upscaleAsset(
+      asset,
+      targetScale,
+      3,
+      maskShape,
+      'none',
+      stampBadge,
+      badgeText
+    );
     await refreshCacheStats();
     return resPath;
   };
@@ -256,6 +303,8 @@ export const App: React.FC = () => {
         onScaleChange={setScale}
         maskShape={maskShape}
         onMaskShapeChange={setMaskShape}
+        stampBadge={stampBadge}
+        onToggleStampBadge={() => setStampBadge(!stampBadge)}
         cacheStats={cacheStats}
         onOpenCacheDir={handleOpenCacheDir}
         onClearCache={handleClearCache}
@@ -276,14 +325,17 @@ export const App: React.FC = () => {
         itemCount={items.length}
         summonerCount={summoners.length}
         runeCount={runes.length}
+        audioCount={audioAssets.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedTag={selectedTag}
         onTagSelect={setSelectedTag}
         filteredCount={filteredAssets.length}
+        masterVolume={masterVolume}
+        onMasterVolumeChange={handleMasterVolumeChange}
       />
 
-      {/* Main Asset Grid */}
+      {/* Main Asset Grid or Audio Grid */}
       {loading ? (
         <div
           style={{
@@ -301,11 +353,14 @@ export const App: React.FC = () => {
             Syncing Riot Data Dragon Catalog v{currentVersion}...
           </div>
         </div>
+      ) : activeTab === 'audio' ? (
+        <AudioGrid assets={filteredAssets as AudioAsset[]} volume={masterVolume} />
       ) : (
         <AssetGrid
           assets={filteredAssets}
           scale={scale}
           maskShape={maskShape}
+          stampBadge={stampBadge}
           pinnedIds={pinnedIds}
           onTogglePin={handleTogglePin}
           onPreview={(asset) => setPreviewAsset(asset)}
@@ -321,6 +376,7 @@ export const App: React.FC = () => {
           onClearAll={handleClearQuickBin}
           scale={scale}
           maskShape={maskShape}
+          stampBadge={stampBadge}
           onPreview={(asset) => setPreviewAsset(asset)}
         />
       )}
@@ -350,6 +406,8 @@ export const App: React.FC = () => {
         onOpenCacheFolder={handleOpenCacheDir}
         onClearCache={handleClearCache}
         currentVersion={currentVersion}
+        masterVolume={masterVolume}
+        onMasterVolumeChange={handleMasterVolumeChange}
       />
     </div>
   );

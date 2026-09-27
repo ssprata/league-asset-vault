@@ -5,6 +5,7 @@ import {
   ResolutionScale,
   DenoiseLevel,
   MaskShape,
+  FrameStyle,
   UpscaleGenerateRequest,
   UpscaleGenerateResult,
   UpscaleProgressPayload,
@@ -25,14 +26,16 @@ export function registerUpscalerHandler(
       asset: AnyAsset,
       scale: ResolutionScale,
       noiseLevel: DenoiseLevel = 3,
-      maskShape: MaskShape = 'square'
+      maskShape: MaskShape = 'square',
+      frameStyle: FrameStyle = 'none',
+      stampBadge: boolean = false
     ) => {
       const version = currentVersionGetter();
-      return await upscalerService.upscaleAsset(version, asset, scale, noiseLevel, maskShape);
+      return await upscalerService.upscaleAsset(version, asset, scale, noiseLevel, maskShape, frameStyle, stampBadge);
     }
   );
 
-  // Dedicated generate handler with explicit scale, noiseLevel, maskShape, and frameStyle
+  // Dedicated generate handler with explicit scale, noiseLevel, maskShape, frameStyle, and stampBadge
   ipcMain.handle(
     IPC_CHANNELS.GENERATE_UPSCALE,
     async (_event, request: UpscaleGenerateRequest): Promise<UpscaleGenerateResult> => {
@@ -44,6 +47,8 @@ export function registerUpscalerHandler(
         noiseLevel,
         maskShape = 'square',
         frameStyle = 'none',
+        stampBadge = false,
+        badgeText,
       } = request;
 
       try {
@@ -89,7 +94,8 @@ export function registerUpscalerHandler(
           scale,
           noiseLevel,
           maskShape,
-          frameStyle
+          frameStyle,
+          stampBadge
         );
 
         const dummyAsset: AnyAsset = {
@@ -105,7 +111,9 @@ export function registerUpscalerHandler(
           scale,
           noiseLevel,
           maskShape,
-          frameStyle
+          frameStyle,
+          stampBadge,
+          badgeText
         );
 
         const dataUrl = await upscalerService.getFileDataUrl(filePath);
@@ -141,6 +149,7 @@ export function registerUpscalerHandler(
         noiseLevel,
         maskShape = 'square',
         frameStyle = 'none',
+        stampBadge = false,
       } = request;
 
       const fileName = request.imageFileName || `${assetId}.png`;
@@ -151,7 +160,8 @@ export function registerUpscalerHandler(
         scale,
         noiseLevel,
         maskShape,
-        frameStyle
+        frameStyle,
+        stampBadge
       );
 
       if (isCached) {
@@ -162,7 +172,8 @@ export function registerUpscalerHandler(
           scale,
           noiseLevel,
           maskShape,
-          frameStyle
+          frameStyle,
+          stampBadge
         );
         const dataUrl = await upscalerService.getFileDataUrl(filePath);
         return {

@@ -4,6 +4,7 @@ import { registerDragHandler } from './ipc/dragHandler';
 import { registerDDragonHandler } from './ipc/ddragonHandler';
 import { registerUpscalerHandler } from './ipc/upscalerHandler';
 import { registerClipboardHandler } from './ipc/clipboardHandler';
+import { registerAudioHandler } from './ipc/audioHandler';
 
 let mainWindow: BrowserWindow | null = null;
 let currentActiveVersion = '14.24.1'; // Updated dynamically on launch
@@ -62,6 +63,7 @@ app.whenReady().then(() => {
     () => mainWindow
   );
   registerClipboardHandler();
+  registerAudioHandler(() => currentActiveVersion);
 
   createWindow();
 

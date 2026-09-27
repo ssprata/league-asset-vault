@@ -43,7 +43,8 @@ export class CacheManager {
     scale: ResolutionScale = '1x',
     noiseLevel: DenoiseLevel = 3,
     maskShape: MaskShape = 'square',
-    frameStyle: FrameStyle = 'none'
+    frameStyle: FrameStyle = 'none',
+    stampBadge: boolean = false
   ): string {
     let subfolder = 'original';
     if (scale === '2x') subfolder = 'upscaled_2x';
@@ -55,11 +56,18 @@ export class CacheManager {
     else if (type === 'ability') typeFolder = 'abilities';
     else if (type === 'rune') typeFolder = 'runes';
     else if (type === 'skin') typeFolder = 'skins';
+    else if (type === 'render') typeFolder = 'renders';
+    else if (type === 'audio') typeFolder = 'audio';
 
     const targetDir = path.join(this.getVersionDir(version), subfolder, typeFolder);
     this.ensureDirExists(targetDir);
 
     let rawId = path.basename(fileName, path.extname(fileName));
+    if (type === 'audio') {
+      const ext = path.extname(fileName) || '.ogg';
+      return path.join(targetDir, `${rawId}${ext}`);
+    }
+
     if (rawId.includes('_scale')) {
       rawId = rawId.split('_scale')[0];
     }
@@ -72,16 +80,20 @@ export class CacheManager {
     if (rawId.includes('_drop_shadow')) {
       rawId = rawId.split('_drop_shadow')[0];
     }
+    if (rawId.includes('_badge')) {
+      rawId = rawId.split('_badge')[0];
+    }
 
     const circleSuffix = maskShape === 'circle' ? '_circle' : '';
     const frameSuffix = frameStyle && frameStyle !== 'none' ? `_${frameStyle}` : '';
+    const badgeSuffix = stampBadge ? '_badge' : '';
 
     if (scale === '1x') {
-      return path.join(targetDir, `${rawId}${circleSuffix}${frameSuffix}.png`);
+      return path.join(targetDir, `${rawId}${circleSuffix}${frameSuffix}${badgeSuffix}.png`);
     }
 
     const scaleNum = scale === '4x' ? '4' : '2';
-    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}${circleSuffix}${frameSuffix}.png`;
+    const fingerprintedName = `${rawId}_scale${scaleNum}x_noise${noiseLevel}${circleSuffix}${frameSuffix}${badgeSuffix}.png`;
     return path.join(targetDir, fingerprintedName);
   }
 
@@ -92,9 +104,10 @@ export class CacheManager {
     scale: ResolutionScale = '1x',
     noiseLevel: DenoiseLevel = 3,
     maskShape: MaskShape = 'square',
-    frameStyle: FrameStyle = 'none'
+    frameStyle: FrameStyle = 'none',
+    stampBadge: boolean = false
   ): boolean {
-    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel, maskShape, frameStyle);
+    const filePath = this.getAssetPath(version, type, fileName, scale, noiseLevel, maskShape, frameStyle, stampBadge);
     return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
   }
 

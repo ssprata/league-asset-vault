@@ -8,6 +8,7 @@ interface QuickBinProps {
   onClearAll: () => void;
   scale: ResolutionScale;
   maskShape?: MaskShape;
+  stampBadge?: boolean;
   onPreview: (asset: AnyAsset) => void;
 }
 
@@ -17,6 +18,7 @@ export const QuickBin: React.FC<QuickBinProps> = ({
   onClearAll,
   scale,
   maskShape = 'square',
+  stampBadge,
   onPreview,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -26,6 +28,18 @@ export const QuickBin: React.FC<QuickBinProps> = ({
     return null;
   }
 
+  const getBadgeText = (asset: AnyAsset) => {
+    if (asset.type === 'ability') {
+      const slot = (asset as any).slot;
+      return slot === 'Passive' ? 'P' : slot;
+    }
+    if (asset.type === 'item') {
+      const gold = (asset as any).goldTotal;
+      return gold !== undefined ? `${gold}g` : undefined;
+    }
+    return undefined;
+  };
+
   const handleDragStart = (e: React.DragEvent, asset: AnyAsset) => {
     e.preventDefault();
     window.electronAPI.startDrag({
@@ -33,6 +47,8 @@ export const QuickBin: React.FC<QuickBinProps> = ({
       assetType: asset.type,
       scale,
       maskShape,
+      stampBadge,
+      badgeText: getBadgeText(asset),
       imageFileName: asset.imageFileName,
       cdnUrl: asset.cdnUrl,
     });
@@ -47,6 +63,8 @@ export const QuickBin: React.FC<QuickBinProps> = ({
         scale,
         noiseLevel: 3,
         maskShape,
+        stampBadge,
+        badgeText: getBadgeText(asset),
         imageFileName: asset.imageFileName,
         cdnUrl: asset.cdnUrl,
       });

@@ -6,6 +6,7 @@ interface AssetCardProps {
   asset: AnyAsset;
   scale: ResolutionScale;
   maskShape?: MaskShape;
+  stampBadge?: boolean;
   isPinned?: boolean;
   onTogglePin?: (asset: AnyAsset) => void;
   onPreview: (asset: AnyAsset) => void;
@@ -16,6 +17,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({
   asset,
   scale,
   maskShape = 'square',
+  stampBadge,
   isPinned = false,
   onTogglePin,
   onPreview,
@@ -45,6 +47,18 @@ export const AssetCard: React.FC<AssetCardProps> = ({
     return '';
   };
 
+  const getBadgeText = () => {
+    if (asset.type === 'ability') {
+      const slot = (asset as AbilityAsset).slot;
+      return slot === 'Passive' ? 'P' : slot;
+    }
+    if (asset.type === 'item') {
+      const gold = (asset as any).goldTotal;
+      return gold !== undefined ? `${gold}g` : undefined;
+    }
+    return undefined;
+  };
+
   const handleDragStart = (e: React.DragEvent) => {
     // Crucial for native OS file drag: prevent browser default HTML dragging
     e.preventDefault();
@@ -55,6 +69,8 @@ export const AssetCard: React.FC<AssetCardProps> = ({
       assetType: asset.type,
       scale,
       maskShape,
+      stampBadge,
+      badgeText: getBadgeText(),
       imageFileName: asset.imageFileName,
       cdnUrl: asset.cdnUrl,
     });
@@ -70,6 +86,8 @@ export const AssetCard: React.FC<AssetCardProps> = ({
         scale,
         noiseLevel: 3,
         maskShape,
+        stampBadge,
+        badgeText: getBadgeText(),
         imageFileName: asset.imageFileName,
         cdnUrl: asset.cdnUrl,
       });

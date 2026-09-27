@@ -1,4 +1,12 @@
-export type AssetType = 'champion' | 'item' | 'summoner' | 'ability' | 'rune' | 'skin';
+export type AssetType =
+  | 'champion'
+  | 'item'
+  | 'summoner'
+  | 'ability'
+  | 'rune'
+  | 'skin'
+  | 'render'
+  | 'audio';
 
 export type ResolutionScale = '1x' | '2x' | '4x';
 
@@ -103,13 +111,46 @@ export interface SkinAsset {
   upscaleStatus?: UpscaleStatus;
 }
 
+export interface RenderAsset {
+  type: 'render';
+  id: string;          // e.g. "266002"
+  championId: string;  // e.g. "Aatrox"
+  championKey?: string; // e.g. "266"
+  skinId?: number;     // e.g. 266002
+  skinName?: string;   // e.g. "Mecha Aatrox"
+  name: string;        // e.g. "Mecha Aatrox Render"
+  imageFileName: string;
+  cdnUrl: string;
+  cachedOriginalPath?: string;
+  cachedUpscaledPath?: string;
+  upscaleStatus?: UpscaleStatus;
+}
+
+export interface AudioAsset {
+  type: 'audio';
+  id: string;          // e.g. "flash_sfx", "266_choose"
+  name: string;        // e.g. "Flash Sound Effect"
+  category: 'spell' | 'item' | 'champion_vo' | 'champion_sfx' | 'ping' | 'announcer';
+  championId?: string;
+  championName?: string;
+  fileName: string;
+  imageFileName?: string;
+  cdnUrl: string;
+  playUrl?: string;
+  duration?: string;
+  cachedPath?: string;
+  tags?: string[];
+}
+
 export type AnyAsset =
   | ChampionAsset
   | ItemAsset
   | SummonerSpellAsset
   | AbilityAsset
   | RuneAsset
-  | SkinAsset;
+  | SkinAsset
+  | RenderAsset
+  | AudioAsset;
 
 export interface AppSettings {
   gpuId: number;              // -1 = CPU, 0 = Auto/Default GPU, 1 = Secondary GPU
@@ -117,6 +158,7 @@ export interface AppSettings {
   defaultDenoise: DenoiseLevel;
   defaultScale: ResolutionScale;
   defaultMaskShape: MaskShape;
+  defaultStampBadge?: boolean;
 }
 
 export interface CacheStats {
@@ -147,10 +189,12 @@ export interface PrecacheProgressPayload {
 export interface DragStartRequest {
   assetId: string;
   assetType: AssetType;
-  scale: ResolutionScale;
+  scale?: ResolutionScale;
   noiseLevel?: DenoiseLevel;
   maskShape?: MaskShape;
   frameStyle?: FrameStyle;
+  stampBadge?: boolean;
+  badgeText?: string;
   skinViewType?: 'splash' | 'loading';
   imageFileName?: string;
   cdnUrl?: string;
@@ -169,6 +213,8 @@ export interface UpscaleGenerateRequest {
   noiseLevel: DenoiseLevel;
   maskShape?: MaskShape;
   frameStyle?: FrameStyle;
+  stampBadge?: boolean;
+  badgeText?: string;
   skinViewType?: 'splash' | 'loading';
   imageFileName?: string;
   cdnUrl?: string;
@@ -183,7 +229,7 @@ export interface UpscaleGenerateResult {
 }
 
 export interface AppElectronAPI {
-  // Data Dragon APIs
+  // Data Dragon & CDragon APIs
   getVersions: () => Promise<string[]>;
   getChampions: (version: string) => Promise<ChampionAsset[]>;
   getItems: (version: string) => Promise<ItemAsset[]>;
@@ -191,6 +237,11 @@ export interface AppElectronAPI {
   getRunes: (version: string) => Promise<RuneAsset[]>;
   getChampionAbilities: (version: string, championId: string) => Promise<AbilityAsset[]>;
   getChampionSkins: (version: string, championId: string) => Promise<SkinAsset[]>;
+  getChampionRenders: (version: string, championId: string) => Promise<RenderAsset[]>;
+  getAudioAssets: (version?: string) => Promise<AudioAsset[]>;
+  getChampionAudio: (championKey: string, championName: string) => Promise<AudioAsset[]>;
+  ensureAudioCached: (asset: AudioAsset) => Promise<string>;
+  getAudioPlayUrl: (asset: AudioAsset) => Promise<string>;
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) => Promise<string>;
 
   // OS Native Drag & Clipboard APIs
@@ -203,7 +254,8 @@ export interface AppElectronAPI {
     scale: ResolutionScale,
     noiseLevel?: DenoiseLevel,
     maskShape?: MaskShape,
-    frameStyle?: FrameStyle
+    frameStyle?: FrameStyle,
+    stampBadge?: boolean
   ) => Promise<string>;
   generateUpscale: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
   getUpscaleInfo: (request: UpscaleGenerateRequest) => Promise<UpscaleGenerateResult>;
@@ -232,4 +284,5 @@ declare global {
     electronAPI: AppElectronAPI;
   }
 }
+
 

@@ -6,6 +6,7 @@ import { DragStartRequest } from '../../shared/types';
 import { cacheManager } from '../services/cacheManager';
 import { ddragonService } from '../services/ddragonService';
 import { upscalerService } from '../services/upscalerService';
+import { audioService } from '../services/audioService';
 
 export function registerDragHandler(currentVersionGetter: () => string): void {
   ipcMain.on(IPC_CHANNELS.START_DRAG, async (event, request: DragStartRequest) => {
@@ -14,15 +15,42 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
       const {
         assetId,
         assetType,
-        scale,
+        scale = '1x',
         noiseLevel = 3,
         maskShape = 'square',
         frameStyle = 'none',
+        stampBadge = false,
+        badgeText,
         imageFileName,
         cdnUrl: requestCdnUrl,
       } = request;
 
-      // Find asset info from DDragon catalog if not passed
+      // Special Handling for Native Audio Files
+      if (assetType === 'audio') {
+        const fileName = imageFileName || `${assetId}.ogg`;
+        const cdnUrl = requestCdnUrl || '';
+        const audioAsset: any = {
+          type: 'audio',
+          id: assetId,
+          name: assetId,
+          fileName,
+          cdnUrl,
+        };
+
+        const targetAudioPath = await audioService.ensureAudioCached(audioAsset);
+        const absoluteAudioPath = path.resolve(targetAudioPath);
+
+        // Native drag with CF_HDROP payload directly into Premiere Pro or DaVinci Resolve
+        event.sender.startDrag({
+          file: absoluteAudioPath,
+          icon: nativeImage.createEmpty(),
+        });
+
+        console.log(`[DragHandler] Initiated native audio CF_HDROP drag payload: ${absoluteAudioPath}`);
+        return;
+      }
+
+      // Visual Asset Handling
       let fileName = imageFileName || `${assetId}.png`;
       let cdnUrl = requestCdnUrl || '';
 
@@ -58,7 +86,7 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
         }
       }
 
-      // Check if requested scale, noise level, mask shape, and frame style is already on disk
+      // Check if requested scale, noise level, mask shape, frame style, and badge stamp is already on disk
       let targetFilePath = cacheManager.getAssetPath(
         version,
         assetType,
@@ -66,12 +94,13 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
         scale,
         noiseLevel,
         maskShape,
-        frameStyle
+        frameStyle,
+        stampBadge
       );
 
       if (!fs.existsSync(targetFilePath) || fs.statSync(targetFilePath).size === 0) {
         console.log(
-          `[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel}, ${maskShape}, ${frameStyle})`
+          `[DragHandler] Resolving asset on disk before drag: ${fileName} (${scale}, noise ${noiseLevel}, ${maskShape}, ${frameStyle}, badge: ${stampBadge})`
         );
         const dummyAsset: any = {
           type: assetType,
@@ -86,7 +115,9 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
           scale,
           noiseLevel,
           maskShape,
-          frameStyle
+          frameStyle,
+          stampBadge,
+          badgeText
         );
       }
 

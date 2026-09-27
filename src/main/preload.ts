@@ -25,6 +25,16 @@ const api: AppElectronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_ABILITIES, version, championId),
   getChampionSkins: (version: string, championId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_SKINS, version, championId),
+  getChampionRenders: (version: string, championId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_RENDERS, version, championId),
+  getAudioAssets: (version?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_AUDIO_ASSETS, version),
+  getChampionAudio: (championKey: string, championName: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CHAMPION_AUDIO, championKey, championName),
+  ensureAudioCached: (asset: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENSURE_AUDIO_CACHED, asset),
+  getAudioPlayUrl: (asset: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_AUDIO_PLAY_URL, asset),
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) =>
     ipcRenderer.invoke(IPC_CHANNELS.ENSURE_ASSET_CACHED, asset, scale),
 
@@ -42,8 +52,18 @@ const api: AppElectronAPI = {
     scale: ResolutionScale,
     noiseLevel?: DenoiseLevel,
     maskShape?: MaskShape,
-    frameStyle?: FrameStyle
-  ) => ipcRenderer.invoke(IPC_CHANNELS.UPSCALE_ASSET, asset, scale, noiseLevel, maskShape, frameStyle),
+    frameStyle?: FrameStyle,
+    stampBadge?: boolean
+  ) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.UPSCALE_ASSET,
+      asset,
+      scale,
+      noiseLevel,
+      maskShape,
+      frameStyle,
+      stampBadge
+    ),
 
   generateUpscale: (request: UpscaleGenerateRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.GENERATE_UPSCALE, request),

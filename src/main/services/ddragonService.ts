@@ -8,6 +8,7 @@ import {
   AbilityAsset,
   RuneAsset,
   SkinAsset,
+  RenderAsset,
   AnyAsset,
   ResolutionScale,
   PrecacheProgressPayload,
@@ -180,7 +181,8 @@ export class DDragonService {
    * Ensures the original asset file is downloaded and cached locally on disk.
    */
   public async ensureOriginalCached(version: string, asset: AnyAsset): Promise<string> {
-    const existingPath = cacheManager.getAssetPath(version, asset.type, asset.imageFileName, '1x');
+    const fileName = (asset as any).imageFileName || (asset as any).fileName || `${asset.id}.png`;
+    const existingPath = cacheManager.getAssetPath(version, asset.type, fileName, '1x');
     if (fs.existsSync(existingPath) && fs.statSync(existingPath).size > 0) {
       return existingPath;
     }
@@ -194,7 +196,7 @@ export class DDragonService {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    return await cacheManager.saveAsset(version, asset.type, asset.imageFileName, buffer, '1x');
+    return await cacheManager.saveAsset(version, asset.type, fileName, buffer, '1x');
   }
 
   /**
@@ -433,6 +435,128 @@ export class DDragonService {
     }
 
     return skins;
+  }
+
+  /**
+   * Fetches transparent character cutouts/renders for a specific champion from CommunityDragon.
+   */
+  public async getChampionRenders(version: string, championId: string): Promise<RenderAsset[]> {
+    // Resolve champion key from championId
+    let championKey = championId;
+    try {
+      const champions = await this.getChampions(version);
+      const champ = champions.find((c) => c.id === championId || c.key === championId);
+      if (champ) {
+        championKey = champ.key;
+      }
+    } catch (e) {
+      console.warn('[DDragonService] Could not lookup champion key for renders:', e);
+    }
+
+    const versionDir = cacheManager.getVersionDir(version);
+    const manifestPath = path.join(versionDir, `cdrag_champ_${championKey}.json`);
+
+    let rawData: any = null;
+    if (fs.existsSync(manifestPath)) {
+      try {
+        rawData = JSON.parse(await fs.promises.readFile(manifestPath, 'utf-8'));
+      } catch (e) {
+        console.warn(`[DDragonService] Corrupted local cdrag detail for ${championKey}, re-fetching...`);
+      }
+    }
+
+    if (!rawData) {
+      try {
+        const url = DDRAGON_ENDPOINTS.CD_CHAMPION_DETAIL(championKey);
+        const res = await fetch(url);
+        if (res.ok) {
+          rawData = await res.json();
+          await fs.promises.writeFile(manifestPath, JSON.stringify(rawData, null, 2));
+        }
+      } catch (err) {
+        console.warn(`[DDragonService] Failed fetching CommunityDragon detail for ${championKey}:`, err);
+      }
+    }
+
+    if (!rawData || !rawData.skins) {
+      return [];
+    }
+
+    const renders: RenderAsset[] = [];
+    const seenIds = new Set<string>();
+
+    for (const skin of rawData.skins) {
+      // Check skin's own chromaPath
+      if (skin.chromaPath) {
+        const skinId = skin.id;
+        const imageFileName = `${skinId}.png`;
+        const cdnUrl = DDRAGON_ENDPOINTS.CHROMA_RENDER_IMAGE(championKey, skinId);
+        const originalCached = cacheManager.assetExists(version, 'render', imageFileName, '1x');
+        const upscaled4xCached = cacheManager.assetExists(version, 'render', imageFileName, '4x');
+        const idStr = String(skinId);
+
+        if (!seenIds.has(idStr)) {
+          seenIds.add(idStr);
+          renders.push({
+            type: 'render',
+            id: idStr,
+            championId,
+            championKey,
+            skinId,
+            skinName: skin.name,
+            name: `${skin.name} (Render)`,
+            imageFileName,
+            cdnUrl,
+            cachedOriginalPath: originalCached
+              ? cacheManager.getAssetPath(version, 'render', imageFileName, '1x')
+              : undefined,
+            cachedUpscaledPath: upscaled4xCached
+              ? cacheManager.getAssetPath(version, 'render', imageFileName, '4x')
+              : undefined,
+            upscaleStatus: upscaled4xCached ? 'ready' : 'none',
+          });
+        }
+      }
+
+      // Check chromas under this skin
+      if (Array.isArray(skin.chromas)) {
+        for (const chroma of skin.chromas) {
+          if (chroma.chromaPath) {
+            const skinId = chroma.id;
+            const imageFileName = `${skinId}.png`;
+            const cdnUrl = DDRAGON_ENDPOINTS.CHROMA_RENDER_IMAGE(championKey, skinId);
+            const originalCached = cacheManager.assetExists(version, 'render', imageFileName, '1x');
+            const upscaled4xCached = cacheManager.assetExists(version, 'render', imageFileName, '4x');
+            const idStr = String(skinId);
+
+            if (!seenIds.has(idStr)) {
+              seenIds.add(idStr);
+              const cName = chroma.name ? `${skin.name} (${chroma.name})` : skin.name;
+              renders.push({
+                type: 'render',
+                id: idStr,
+                championId,
+                championKey,
+                skinId,
+                skinName: cName,
+                name: `${cName} (Render)`,
+                imageFileName,
+                cdnUrl,
+                cachedOriginalPath: originalCached
+                  ? cacheManager.getAssetPath(version, 'render', imageFileName, '1x')
+                  : undefined,
+                cachedUpscaledPath: upscaled4xCached
+                  ? cacheManager.getAssetPath(version, 'render', imageFileName, '4x')
+                  : undefined,
+                upscaleStatus: upscaled4xCached ? 'ready' : 'none',
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return renders;
   }
 
   /**

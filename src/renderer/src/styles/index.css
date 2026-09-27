@@ -158,3 +158,38 @@ body {
 .animate-pulse-glow {
   animation: pulseGlow 2.5s infinite ease-in-out;
 }
+
+/* Hextech Volume Range Slider */
+.hextech-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  vertical-align: middle;
+}
+
+.hextech-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0e6d2 0%, #c8aa6e 100%);
+  border: 1px solid #785a28;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.7);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.hextech-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.95);
+}
+
+.hextech-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+

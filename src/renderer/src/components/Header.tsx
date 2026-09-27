@@ -12,6 +12,7 @@ import {
   Bookmark,
   Circle,
   Square,
+  Tag,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -22,6 +23,8 @@ interface HeaderProps {
   onScaleChange: (scale: ResolutionScale) => void;
   maskShape: MaskShape;
   onMaskShapeChange: (shape: MaskShape) => void;
+  stampBadge?: boolean;
+  onToggleStampBadge?: () => void;
   cacheStats: CacheStats | null;
   onOpenCacheDir: () => void;
   onClearCache: () => Promise<void>;
@@ -42,6 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
   onScaleChange,
   maskShape,
   onMaskShapeChange,
+  stampBadge,
+  onToggleStampBadge,
   cacheStats,
   onOpenCacheDir,
   onClearCache,
@@ -240,6 +245,34 @@ export const Header: React.FC<HeaderProps> = ({
             <Circle size={11} /> Circle
           </button>
         </div>
+
+        {/* Global Corner Badge Stamping Toggle */}
+        {onToggleStampBadge && (
+          <button
+            onClick={onToggleStampBadge}
+            style={{
+              background: stampBadge
+                ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.3) 0%, rgba(120, 90, 40, 0.4) 100%)'
+                : 'rgba(5, 8, 17, 0.8)',
+              border: stampBadge ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
+              color: stampBadge ? '#ffffff' : 'var(--text-secondary)',
+              padding: '4px 10px',
+              borderRadius: 8,
+              fontSize: '0.72rem',
+              fontWeight: stampBadge ? 700 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              transition: 'all 0.15s ease',
+              boxShadow: stampBadge ? '0 0 10px rgba(200, 170, 110, 0.2)' : 'none',
+            }}
+            title="Automatically stamp ability key (Q/W/E/R) or item gold cost in the corner of exported icons"
+          >
+            <Tag size={12} color={stampBadge ? 'var(--gold-primary)' : '#64748b'} />
+            <span>Badge {stampBadge ? 'ON' : 'OFF'}</span>
+          </button>
+        )}
       </div>
 
       {/* Right Controls: QuickBin, Batch, Cache, Settings */}

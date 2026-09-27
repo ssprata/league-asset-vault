@@ -28,6 +28,16 @@ export const DDRAGON_ENDPOINTS = {
     `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${id}_${num}.jpg`,
   LOADING_IMAGE: (id: string, num: number) =>
     `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${id}_${num}.jpg`,
+  CHROMA_RENDER_IMAGE: (championKey: string, skinId: number | string) =>
+    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championKey}/${skinId}.png`,
+  CD_CHAMPION_DETAIL: (championKey: string) =>
+    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champions/${championKey}.json`,
+  CD_CHOOSE_VO: (championKey: string) =>
+    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-choose-vo/${championKey}.ogg`,
+  CD_BAN_VO: (championKey: string) =>
+    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-ban-vo/${championKey}.ogg`,
+  CD_SFX_AUDIO: (championKey: string) =>
+    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-sfx-audios/${championKey}.ogg`,
 };
 
 export const IPC_CHANNELS = {
@@ -38,6 +48,11 @@ export const IPC_CHANNELS = {
   GET_RUNES: 'ddragon:get-runes',
   GET_CHAMPION_ABILITIES: 'ddragon:get-champion-abilities',
   GET_CHAMPION_SKINS: 'ddragon:get-champion-skins',
+  GET_CHAMPION_RENDERS: 'ddragon:get-champion-renders',
+  GET_AUDIO_ASSETS: 'audio:get-assets',
+  GET_CHAMPION_AUDIO: 'audio:get-champion',
+  ENSURE_AUDIO_CACHED: 'audio:ensure-cached',
+  GET_AUDIO_PLAY_URL: 'audio:get-play-url',
   ENSURE_ASSET_CACHED: 'cache:ensure-asset',
   START_DRAG: 'drag:start',
   CLIPBOARD_COPY: 'clipboard:copy-image',
@@ -63,6 +78,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultDenoise: 3,
   defaultScale: '4x',
   defaultMaskShape: 'square',
+  defaultStampBadge: false,
 };
 
 export const DENOISE_OPTIONS = [
@@ -111,5 +127,14 @@ export const FRAME_STYLES = [
   { id: 'none', label: 'Clean', desc: 'Raw icon without additional frame' },
   { id: 'gold_border', label: 'Hextech Gold', desc: 'Crisp metallic gold border' },
   { id: 'drop_shadow', label: 'Drop Shadow', desc: 'Soft dark drop shadow for bright gameplay backgrounds' },
+] as const;
+
+export const AUDIO_TAGS = [
+  'All',
+  'Spells',
+  'Items',
+  'Pings',
+  'Voice Lines',
+  'Announcer',
 ] as const;
 

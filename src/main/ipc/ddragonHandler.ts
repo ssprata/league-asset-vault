@@ -52,6 +52,14 @@ export function registerDDragonHandler(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.GET_CHAMPION_RENDERS,
+    async (_event, version: string, championId: string) => {
+      currentVersionSetter(version);
+      return await ddragonService.getChampionRenders(version, championId);
+    }
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.ENSURE_ASSET_CACHED,
     async (_event, asset: AnyAsset, scale: ResolutionScale) => {
       const version = currentVersionGetter();

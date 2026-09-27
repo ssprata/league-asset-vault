@@ -1,6 +1,49 @@
 import fs from 'fs';
 import { PNG } from 'pngjs';
 import { MaskShape, FrameStyle } from '../../shared/types';
+const BITMAP_FONT: Record<string, string[]> = {
+  '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+  '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  '2': ['01110', '10001', '00001', '00110', '01000', '10000', '11111'],
+  '3': ['01110', '10001', '00001', '00110', '00001', '10001', '01110'],
+  '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+  '5': ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+  '6': ['01110', '10000', '11110', '10001', '10001', '10001', '01110'],
+  '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  '9': ['01110', '10001', '10001', '01111', '00001', '00001', '01110'],
+  'A': ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  'B': ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  'C': ['01110', '10001', '10000', '10000', '10000', '10001', '01110'],
+  'D': ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
+  'E': ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  'F': ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+  'G': ['01110', '10001', '10000', '10111', '10001', '10001', '01110'],
+  'H': ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+  'I': ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
+  'J': ['00111', '00010', '00010', '00010', '00010', '10010', '01100'],
+  'K': ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
+  'L': ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  'M': ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+  'N': ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+  'O': ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  'P': ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  'Q': ['01110', '10001', '10001', '10001', '10101', '10010', '01101'],
+  'R': ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  'S': ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+  'T': ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  'U': ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
+  'V': ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
+  'W': ['10001', '10001', '10001', '10101', '10101', '11011', '10001'],
+  'X': ['10001', '10001', '01010', '00100', '01010', '10001', '10001'],
+  'Y': ['10001', '10001', '01010', '00100', '00100', '00100', '00100'],
+  'Z': ['11111', '00001', '00010', '00100', '01000', '10000', '11111'],
+  'g': ['00000', '01110', '10001', '10001', '01111', '00001', '01110'],
+  'k': ['10000', '10000', '10010', '10100', '11000', '10100', '10010'],
+  '+': ['00000', '00100', '00100', '11111', '00100', '00100', '00000'],
+  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+  ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
+};
 
 export class AlphaMasker {
   /**
@@ -131,39 +174,59 @@ export class AlphaMasker {
   }
 
   /**
-   * Processes a PNG buffer with the requested mask shape and frame styling.
+   * Processes a PNG buffer with the requested mask shape, frame styling, and optional badge stamp.
    */
   public static async processImage(
     inputBuffer: Buffer,
     shape: MaskShape = 'square',
-    frameStyle: FrameStyle = 'none'
+    frameStyle: FrameStyle = 'none',
+    badgeText?: string
   ): Promise<Buffer> {
     if (frameStyle === 'drop_shadow') {
-      return await this.applyDropShadow(inputBuffer, shape);
+      const png = await this.decodePng(inputBuffer);
+      if (shape === 'circle') {
+        this.maskCircleInPlace(png);
+      }
+      if (badgeText) {
+        this.stampBadgeInPlace(png, badgeText, shape);
+      }
+      const stagedBuffer = await this.encodePng(png);
+      return await this.applyDropShadow(stagedBuffer, shape);
+    }
+
+    const png = await this.decodePng(inputBuffer);
+
+    if (shape === 'circle') {
+      this.maskCircleInPlace(png);
+    }
+
+    if (badgeText) {
+      this.stampBadgeInPlace(png, badgeText, shape);
     }
 
     if (frameStyle === 'gold_border') {
-      return await this.applyGoldBorder(inputBuffer, shape);
+      if (shape === 'circle') {
+        this.applyCircleGoldBorderInPlace(png);
+      } else {
+        this.applySquareGoldBorderInPlace(png);
+      }
     }
 
-    if (shape === 'circle') {
-      return await this.applyCircleMask(inputBuffer);
-    }
-
-    return inputBuffer;
+    return await this.encodePng(png);
   }
 
   /**
-   * Reads a PNG file on disk, processes shape and framing, and writes to target path.
+   * Reads a PNG file on disk, processes shape, framing, and badge, and writes to target path.
    */
   public static async processFileToDisk(
     inputPath: string,
     outputPath: string,
     shape: MaskShape = 'square',
-    frameStyle: FrameStyle = 'none'
+    frameStyle: FrameStyle = 'none',
+    badgeText?: string
   ): Promise<string> {
     const buffer = await fs.promises.readFile(inputPath);
-    const result = await this.processImage(buffer, shape, frameStyle);
+    const result = await this.processImage(buffer, shape, frameStyle, badgeText);
     await fs.promises.writeFile(outputPath, result);
     return outputPath;
   }
@@ -173,6 +236,163 @@ export class AlphaMasker {
    */
   public static async maskFileToDisk(inputPath: string, outputPath: string): Promise<string> {
     return await this.processFileToDisk(inputPath, outputPath, 'circle', 'none');
+  }
+
+  /**
+   * Stamps a sleek Hextech dark pill badge with gold border and custom text
+   * (e.g. "Q", "W", "E", "R", "P", "3000g") directly onto the PNG buffer.
+   */
+  private static stampBadgeInPlace(png: PNG, text: string, shape: MaskShape): void {
+    if (!text || text.trim() === '') return;
+    const cleanText = text.trim();
+    const width = png.width;
+    const height = png.height;
+    const data = png.data;
+
+    // Font scaling: 1x on 64px, 2x on 120px, 4x on 256px, 8x on 512px
+    const scale = Math.max(1, Math.round(width / 58));
+    const charW = 5 * scale;
+    const charH = 7 * scale;
+    const spacing = Math.max(1, Math.round(scale * 0.8));
+
+    const textWidth = cleanText.length * charW + (cleanText.length - 1) * spacing;
+    const textHeight = charH;
+
+    const padX = Math.max(3, Math.round(scale * 2.2));
+    const padY = Math.max(2, Math.round(scale * 1.6));
+    const pillW = textWidth + padX * 2;
+    const pillH = textHeight + padY * 2;
+    const radius = Math.max(2, Math.round(scale * 1.8));
+
+    let badgeX: number;
+    let badgeY: number;
+
+    if (shape === 'circle') {
+      const cx = width / 2;
+      const cy = height / 2;
+      const circleR = width / 2 - 2;
+      // Position neatly inside the bottom-right curve of circular mask
+      badgeX = Math.round(cx + (circleR - pillW) * 0.58);
+      badgeY = Math.round(cy + (circleR - pillH) * 0.58);
+    } else {
+      const margin = Math.max(2, Math.round(width * 0.035));
+      badgeX = width - pillW - margin;
+      badgeY = height - pillH - margin;
+    }
+
+    badgeX = Math.max(0, Math.min(width - pillW, badgeX));
+    badgeY = Math.max(0, Math.min(height - pillH, badgeY));
+
+    const isGoldCost = cleanText.toLowerCase().endsWith('g') || /^\d+$/.test(cleanText);
+    const borderR = 200, borderG = 170, borderB = 110;
+    const textR = isGoldCost ? 255 : 255;
+    const textG = isGoldCost ? 220 : 255;
+    const textB = isGoldCost ? 80 : 255;
+
+    // 1. Draw rounded badge pill
+    for (let py = 0; py < pillH; py++) {
+      for (let px = 0; px < pillW; px++) {
+        const x = badgeX + px;
+        const y = badgeY + py;
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+
+        let isInside = true;
+        let isBorder = false;
+
+        const leftDist = px;
+        const rightDist = pillW - 1 - px;
+        const topDist = py;
+        const bottomDist = pillH - 1 - py;
+
+        if (leftDist < radius && topDist < radius) {
+          const d = Math.hypot(radius - leftDist, radius - topDist);
+          if (d > radius) isInside = false;
+          else if (d > radius - 1.2) isBorder = true;
+        } else if (rightDist < radius && topDist < radius) {
+          const d = Math.hypot(radius - rightDist, radius - topDist);
+          if (d > radius) isInside = false;
+          else if (d > radius - 1.2) isBorder = true;
+        } else if (leftDist < radius && bottomDist < radius) {
+          const d = Math.hypot(radius - leftDist, radius - bottomDist);
+          if (d > radius) isInside = false;
+          else if (d > radius - 1.2) isBorder = true;
+        } else if (rightDist < radius && bottomDist < radius) {
+          const d = Math.hypot(radius - rightDist, radius - bottomDist);
+          if (d > radius) isInside = false;
+          else if (d > radius - 1.2) isBorder = true;
+        }
+
+        if (leftDist === 0 || rightDist === 0 || topDist === 0 || bottomDist === 0) {
+          isBorder = true;
+        }
+
+        if (!isInside) continue;
+
+        const idx = (y * width + x) * 4;
+        if (isBorder) {
+          data[idx] = borderR;
+          data[idx + 1] = borderG;
+          data[idx + 2] = borderB;
+          data[idx + 3] = 245;
+        } else {
+          // Dark background pill with 90% opacity
+          const sa = 0.90;
+          const da = (data[idx + 3] / 255.0) * (1.0 - sa);
+          const outA = sa + da;
+          data[idx] = Math.round((10 * sa + data[idx] * da) / outA);
+          data[idx + 1] = Math.round((15 * sa + data[idx + 1] * da) / outA);
+          data[idx + 2] = Math.round((24 * sa + data[idx + 2] * da) / outA);
+          data[idx + 3] = Math.round(outA * 255);
+        }
+      }
+    }
+
+    // 2. Draw text glyphs with 1px drop shadow
+    let currentX = badgeX + padX;
+    const currentY = badgeY + padY;
+
+    for (let c = 0; c < cleanText.length; c++) {
+      const char = cleanText[c];
+      const glyph = BITMAP_FONT[char] || BITMAP_FONT[char.toUpperCase()] || BITMAP_FONT[' '];
+
+      for (let row = 0; row < 7; row++) {
+        for (let col = 0; col < 5; col++) {
+          if (glyph[row][col] === '1') {
+            // Shadow offset by 1px
+            const shadowX = currentX + col * scale + 1;
+            const shadowY = currentY + row * scale + 1;
+            for (let sy = 0; sy < scale; sy++) {
+              for (let sx = 0; sx < scale; sx++) {
+                const sxCoord = shadowX + sx;
+                const syCoord = shadowY + sy;
+                if (sxCoord >= 0 && sxCoord < width && syCoord >= 0 && syCoord < height) {
+                  const sIdx = (syCoord * width + sxCoord) * 4;
+                  data[sIdx] = Math.round(data[sIdx] * 0.3);
+                  data[sIdx + 1] = Math.round(data[sIdx + 1] * 0.3);
+                  data[sIdx + 2] = Math.round(data[sIdx + 2] * 0.3);
+                }
+              }
+            }
+
+            // Foreground glyph
+            for (let sy = 0; sy < scale; sy++) {
+              for (let sx = 0; sx < scale; sx++) {
+                const gx = currentX + col * scale + sx;
+                const gy = currentY + row * scale + sy;
+                if (gx >= 0 && gx < width && gy >= 0 && gy < height) {
+                  const gIdx = (gy * width + gx) * 4;
+                  data[gIdx] = textR;
+                  data[gIdx + 1] = textG;
+                  data[gIdx + 2] = textB;
+                  data[gIdx + 3] = 255;
+                }
+              }
+            }
+          }
+        }
+      }
+      currentX += charW + spacing;
+    }
   }
 
   private static maskCircleInPlace(png: PNG): void {

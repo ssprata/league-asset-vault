@@ -20,16 +20,21 @@ export class UpscalerService {
     scale: ResolutionScale,
     noiseLevel: DenoiseLevel = 3,
     maskShape: MaskShape = 'square',
-    frameStyle: FrameStyle = 'none'
+    frameStyle: FrameStyle = 'none',
+    stampBadge: boolean = false,
+    badgeText?: string
   ): Promise<string> {
+    const shouldStamp = !!stampBadge;
+    const fileName = (asset as any).imageFileName || (asset as any).fileName || `${asset.id}.png`;
     const targetPath = cacheManager.getAssetPath(
       version,
       asset.type,
-      asset.imageFileName,
+      fileName,
       scale,
       noiseLevel,
       maskShape,
-      frameStyle
+      frameStyle,
+      shouldStamp
     );
 
     if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
@@ -40,11 +45,12 @@ export class UpscalerService {
     let squarePath = cacheManager.getAssetPath(
       version,
       asset.type,
-      asset.imageFileName,
+      fileName,
       scale,
       noiseLevel,
       'square',
-      'none'
+      'none',
+      false
     );
 
     if (!fs.existsSync(squarePath) || fs.statSync(squarePath).size === 0) {
@@ -73,13 +79,33 @@ export class UpscalerService {
       }
     }
 
-    // Step 2: If circle mask or framing is requested, apply styling
-    if (maskShape === 'circle' || frameStyle !== 'none') {
+    // Determine badge text if stamping is requested
+    let effectiveBadgeText: string | undefined = undefined;
+    if (shouldStamp) {
+      if (badgeText) {
+        effectiveBadgeText = badgeText;
+      } else if (asset.type === 'ability') {
+        const slot = (asset as any).slot;
+        effectiveBadgeText = slot === 'Passive' ? 'P' : slot || '';
+      } else if (asset.type === 'item') {
+        const gold = (asset as any).goldTotal;
+        effectiveBadgeText = gold !== undefined ? `${gold}g` : '';
+      }
+    }
+
+    // Step 2: If circle mask, framing, or badge stamping is requested, apply styling
+    if (maskShape === 'circle' || frameStyle !== 'none' || (shouldStamp && effectiveBadgeText)) {
       try {
-        await AlphaMasker.processFileToDisk(squarePath, targetPath, maskShape, frameStyle);
+        await AlphaMasker.processFileToDisk(
+          squarePath,
+          targetPath,
+          maskShape,
+          frameStyle,
+          effectiveBadgeText
+        );
         return targetPath;
       } catch (styleErr) {
-        console.error('[UpscalerService] Failed applying shape/frame styling, using square:', styleErr);
+        console.error('[UpscalerService] Failed applying shape/frame/badge styling, using square:', styleErr);
         return squarePath;
       }
     }

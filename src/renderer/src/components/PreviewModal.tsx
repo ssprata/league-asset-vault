@@ -9,6 +9,7 @@ import {
   ChampionAsset,
   RuneAsset,
   SkinAsset,
+  RenderAsset,
 } from '@shared/types';
 import { DENOISE_OPTIONS, FRAME_STYLES } from '@shared/constants';
 import {
@@ -26,8 +27,10 @@ import {
   Flame,
   ChevronsLeftRight,
   Columns2,
-  Palette,
   Image as ImageIcon,
+  Tag,
+  Scissors,
+  Search,
 } from 'lucide-react';
 
 interface PreviewModalProps {
@@ -48,23 +51,31 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [activeAsset, setActiveAsset] = useState<AnyAsset | null>(asset);
   const [parentChampion, setParentChampion] = useState<ChampionAsset | null>(null);
 
-  // Champion sub-navigation: Abilities vs Skins
-  const [champTab, setChampTab] = useState<'abilities' | 'skins'>('abilities');
+  // Champion sub-navigation: Abilities vs Skins vs Transparent Renders
+  const [champTab, setChampTab] = useState<'abilities' | 'skins' | 'renders'>('abilities');
   const [abilities, setAbilities] = useState<AbilityAsset[]>([]);
   const [skins, setSkins] = useState<SkinAsset[]>([]);
+  const [renders, setRenders] = useState<RenderAsset[]>([]);
   const [loadingAbilities, setLoadingAbilities] = useState(false);
   const [loadingSkins, setLoadingSkins] = useState(false);
+  const [loadingRenders, setLoadingRenders] = useState(false);
   const [skinViewType, setSkinViewType] = useState<'splash' | 'loading'>('splash');
 
-  // Upscale settings & state
+  // Scale selected inside modal (allows selecting 1x, 2x, or 4x inside the modal)
+  const [selectedScale, setSelectedScale] = useState<ResolutionScale>(scale || '4x');
   const [selectedDenoise, setSelectedDenoise] = useState<DenoiseLevel>(3);
   const [maskShape, setMaskShape] = useState<MaskShape>('square');
   const [frameStyle, setFrameStyle] = useState<FrameStyle>('none');
+  const [stampBadge, setStampBadge] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [isCached, setIsCached] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [cachedFilePath, setCachedFilePath] = useState<string | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
+
+  // Gallery search queries
+  const [skinSearch, setSkinSearch] = useState('');
+  const [renderSearch, setRenderSearch] = useState('');
 
   // Before / After Comparison mode & Split slider
   const [viewMode, setViewMode] = useState<'split' | 'side_by_side'>('split');
@@ -72,7 +83,10 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [isDraggingSlider, setIsDraggingSlider] = useState<boolean>(false);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  const effectiveScale: ResolutionScale = scale === '1x' ? '4x' : scale;
+  // Sync scale when modal opens
+  useEffect(() => {
+    if (scale) setSelectedScale(scale);
+  }, [scale]);
 
   // Sync initial asset when modal opens
   useEffect(() => {
@@ -85,7 +99,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   }, [asset]);
 
-  // Load champion abilities and skins
+  // Load champion abilities, skins, and transparent character renders
   useEffect(() => {
     const champ = parentChampion || (activeAsset?.type === 'champion' ? (activeAsset as ChampionAsset) : null);
     if (!champ) return;
@@ -94,21 +108,39 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     async function loadChampData() {
       setLoadingAbilities(true);
       setLoadingSkins(true);
+      setLoadingRenders(true);
       try {
-        const [abList, skinList] = await Promise.all([
+        const [abList, skinList, renderList] = await Promise.all([
           window.electronAPI.getChampionAbilities(currentVersion, champ!.id),
           window.electronAPI.getChampionSkins(currentVersion, champ!.id),
+          window.electronAPI.getChampionRenders(currentVersion, champ!.id),
         ]);
         if (isSubscribed) {
           setAbilities(abList);
           setSkins(skinList);
+          setRenders(renderList);
+
+          // If currently focused on generic champion icon, switch activeAsset to the first sub-item
+          if (activeAsset?.type === 'champion') {
+            if (champTab === 'abilities' && abList.length > 0) {
+              setActiveAsset(abList[0]);
+            } else if (champTab === 'skins' && skinList.length > 0) {
+              setActiveAsset({
+                ...skinList[0],
+                cdnUrl: skinViewType === 'splash' ? skinList[0].splashUrl : skinList[0].loadingUrl,
+              });
+            } else if (champTab === 'renders' && renderList.length > 0) {
+              setActiveAsset(renderList[0]);
+            }
+          }
         }
       } catch (err) {
-        console.error('Failed loading champion abilities or skins:', err);
+        console.error('Failed loading champion abilities, skins, or renders:', err);
       } finally {
         if (isSubscribed) {
           setLoadingAbilities(false);
           setLoadingSkins(false);
+          setLoadingRenders(false);
         }
       }
     }
@@ -117,7 +149,29 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     return () => {
       isSubscribed = false;
     };
-  }, [parentChampion, activeAsset, currentVersion]);
+  }, [parentChampion, currentVersion]);
+
+  // Sub-tab switching handler that updates activeAsset to the first item of that tab
+  const handleTabChange = (newTab: 'abilities' | 'skins' | 'renders') => {
+    setChampTab(newTab);
+    if (newTab === 'abilities' && abilities.length > 0) {
+      if (activeAsset?.type !== 'ability') {
+        setActiveAsset(abilities[0]);
+      }
+    } else if (newTab === 'skins' && skins.length > 0) {
+      if (activeAsset?.type !== 'skin') {
+        const first = skins[0];
+        setActiveAsset({
+          ...first,
+          cdnUrl: skinViewType === 'splash' ? first.splashUrl : first.loadingUrl,
+        });
+      }
+    } else if (newTab === 'renders' && renders.length > 0) {
+      if (activeAsset?.type !== 'render') {
+        setActiveAsset(renders[0]);
+      }
+    }
+  };
 
   // Keyboard navigation & shortcuts
   useEffect(() => {
@@ -125,15 +179,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       if (e.key === 'Escape') {
         onClose();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        if (cachedFilePath) {
-          e.preventDefault();
-          handleCopy();
-        }
+        e.preventDefault();
+        handleCopy();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, cachedFilePath]);
+  }, [onClose, cachedFilePath, activeAsset, selectedScale]);
 
   // Slider dragging handlers
   useEffect(() => {
@@ -158,20 +210,43 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     };
   }, [isDraggingSlider]);
 
+  const getBadgeText = () => {
+    if (!activeAsset) return undefined;
+    if (activeAsset.type === 'ability') {
+      const slot = (activeAsset as AbilityAsset).slot;
+      return slot === 'Passive' ? 'P' : slot;
+    }
+    if (activeAsset.type === 'item') {
+      const gold = (activeAsset as any).goldTotal;
+      return gold !== undefined ? `${gold}g` : undefined;
+    }
+    return undefined;
+  };
+
   // Check if current combination exists in cache on disk
   useEffect(() => {
     if (!activeAsset) return;
     let active = true;
 
     async function checkExistingUpscale() {
+      // 1x scale without modifications is always ready
+      if (selectedScale === '1x' && maskShape === 'square' && frameStyle === 'none' && !stampBadge) {
+        setPreviewDataUrl(activeAsset!.cdnUrl);
+        setCachedFilePath(null);
+        setIsCached(true);
+        return;
+      }
+
       try {
         const res = await window.electronAPI.getUpscaleInfo({
           assetId: activeAsset!.id,
           assetType: activeAsset!.type,
-          scale: effectiveScale,
+          scale: selectedScale,
           noiseLevel: selectedDenoise,
           maskShape,
           frameStyle,
+          stampBadge,
+          badgeText: getBadgeText(),
           imageFileName: activeAsset!.imageFileName,
           cdnUrl: activeAsset!.cdnUrl,
         });
@@ -195,7 +270,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     return () => {
       active = false;
     };
-  }, [activeAsset, selectedDenoise, effectiveScale, maskShape, frameStyle]);
+  }, [activeAsset, selectedDenoise, selectedScale, maskShape, frameStyle, stampBadge]);
 
   if (!activeAsset) return null;
 
@@ -204,15 +279,40 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const isSummoner = activeAsset.type === 'summoner';
   const isRune = activeAsset.type === 'rune';
   const isSkin = activeAsset.type === 'skin';
+  const isRender = activeAsset.type === 'render';
 
   const isWideSplash = isSkin && skinViewType === 'splash';
 
   // Base dimensions calculation
   const getDims = () => {
-    if (isWideSplash) return { orig: '1215 × 717 px', upscaled: '2430 × 1434 px (4K Ready)' };
-    if (isSkin && skinViewType === 'loading') return { orig: '308 × 560 px', upscaled: '616 × 1120 px' };
-    if (isChamp) return { orig: '128 × 128 px', upscaled: '512 × 512 px (4x UHD)' };
-    return { orig: '64 × 64 px', upscaled: '256 × 256 px (4x UHD)' };
+    if (isWideSplash) {
+      const orig = '1215 × 717 px';
+      if (selectedScale === '1x') return { orig, upscaled: '1215 × 717 px (Original)' };
+      if (selectedScale === '2x') return { orig, upscaled: '2430 × 1434 px (2x HD)' };
+      return { orig, upscaled: '4860 × 2868 px (4x UHD Ready)' };
+    }
+    if (isSkin && skinViewType === 'loading') {
+      const orig = '308 × 560 px';
+      if (selectedScale === '1x') return { orig, upscaled: '308 × 560 px (Original)' };
+      if (selectedScale === '2x') return { orig, upscaled: '616 × 1120 px (2x HD)' };
+      return { orig, upscaled: '1232 × 2240 px (4x UHD)' };
+    }
+    if (isRender) {
+      const orig = '270 × 303 px';
+      if (selectedScale === '1x') return { orig, upscaled: '270 × 303 px (Original Cutout)' };
+      if (selectedScale === '2x') return { orig, upscaled: '540 × 606 px (2x HD)' };
+      return { orig, upscaled: '1080 × 1212 px (4x UHD Cutout)' };
+    }
+    if (isChamp) {
+      const orig = '128 × 128 px';
+      if (selectedScale === '1x') return { orig, upscaled: '128 × 128 px (Original)' };
+      if (selectedScale === '2x') return { orig, upscaled: '256 × 256 px (2x HD)' };
+      return { orig, upscaled: '512 × 512 px (4x UHD)' };
+    }
+    const orig = '64 × 64 px';
+    if (selectedScale === '1x') return { orig, upscaled: '64 × 64 px (Original)' };
+    if (selectedScale === '2x') return { orig, upscaled: '128 × 128 px (2x HD)' };
+    return { orig, upscaled: '256 × 256 px (4x UHD)' };
   };
 
   const dims = getDims();
@@ -223,10 +323,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       const res = await window.electronAPI.generateUpscale({
         assetId: activeAsset.id,
         assetType: activeAsset.type,
-        scale: effectiveScale,
+        scale: selectedScale,
         noiseLevel: selectedDenoise,
         maskShape,
         frameStyle,
+        stampBadge,
+        badgeText: getBadgeText(),
         imageFileName: activeAsset.imageFileName,
         cdnUrl: activeAsset.cdnUrl,
       });
@@ -254,10 +356,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const res = await window.electronAPI.generateUpscale({
           assetId: activeAsset.id,
           assetType: activeAsset.type,
-          scale: effectiveScale,
+          scale: selectedScale,
           noiseLevel: selectedDenoise,
           maskShape,
           frameStyle,
+          stampBadge,
+          badgeText: getBadgeText(),
           imageFileName: activeAsset.imageFileName,
           cdnUrl: activeAsset.cdnUrl,
         });
@@ -281,15 +385,18 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
-  const handleDragFromModal = (e: React.DragEvent) => {
+  const handleDragFromModal = (e: React.DragEvent, forceOriginal: boolean = false) => {
     e.preventDefault();
+    const scaleToUse: ResolutionScale = forceOriginal || selectedScale === '1x' ? '1x' : selectedScale;
     window.electronAPI.startDrag({
       assetId: activeAsset.id,
       assetType: activeAsset.type,
-      scale: effectiveScale,
+      scale: scaleToUse,
       noiseLevel: selectedDenoise,
-      maskShape,
-      frameStyle,
+      maskShape: forceOriginal ? 'square' : maskShape,
+      frameStyle: forceOriginal ? 'none' : frameStyle,
+      stampBadge: forceOriginal ? false : stampBadge,
+      badgeText: forceOriginal ? undefined : getBadgeText(),
       imageFileName: activeAsset.imageFileName,
       cdnUrl: activeAsset.cdnUrl,
     });
@@ -308,10 +415,26 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
     if (isSkin) {
       const sk = activeAsset as SkinAsset;
-      return `${sk.championId} Skin &bull; ${skinViewType === 'splash' ? 'Full Splash Art' : 'Loading Screen Card'}`;
+      return `${sk.championId} Skin &bull; ${skinViewType === 'splash' ? 'Full 16:9 Splash Art' : 'Loading Screen Card'}`;
+    }
+    if (isRender) {
+      const rn = activeAsset as RenderAsset;
+      return `${rn.championId} &bull; ${rn.skinName || 'Character Cutout'} &bull; Transparent Alpha PNG`;
     }
     return `Item Cost: ${(activeAsset as any).goldTotal || 0} Gold`;
   };
+
+  // Filtered skins & renders for search inputs
+  const filteredSkins = skins.filter((sk) => {
+    if (!skinSearch.trim()) return true;
+    return sk.name.toLowerCase().includes(skinSearch.toLowerCase());
+  });
+
+  const filteredRenders = renders.filter((rn) => {
+    if (!renderSearch.trim()) return true;
+    const q = renderSearch.toLowerCase();
+    return (rn.skinName && rn.skinName.toLowerCase().includes(q)) || rn.name.toLowerCase().includes(q);
+  });
 
   return (
     <div
@@ -332,15 +455,15 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         className="glass-panel"
         style={{
           width: '100%',
-          maxWidth: isWideSplash ? 920 : 860,
+          maxWidth: isWideSplash ? 940 : 880,
           maxHeight: '94vh',
           borderRadius: 12,
-          padding: 22,
+          padding: 20,
           border: '1px solid var(--gold-primary)',
           boxShadow: '0 20px 50px rgba(0,0,0,0.85), 0 0 30px rgba(200, 170, 110, 0.2)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 14,
+          gap: 12,
           overflowY: 'auto',
           transition: 'max-width 0.2s ease',
         }}
@@ -350,7 +473,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {(isAbility || isSkin) && parentChampion && (
+              {(isAbility || isSkin || isRender) && parentChampion && (
                 <button
                   onClick={() => setActiveAsset(parentChampion)}
                   className="btn-hextech"
@@ -407,24 +530,24 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           </button>
         </div>
 
-        {/* Champion Sub-Navigation: Abilities vs Skins & Splash Art */}
-        {(isChamp || ((isAbility || isSkin) && parentChampion)) && (
+        {/* Champion Sub-Navigation: Abilities vs Skins vs Transparent Renders */}
+        {(isChamp || ((isAbility || isSkin || isRender) && parentChampion)) && (
           <div
             style={{
               background: 'rgba(5, 8, 17, 0.85)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 8,
-              padding: '8px 12px',
+              padding: '10px 12px',
               display: 'flex',
               flexDirection: 'column',
               gap: 8,
             }}
           >
             {/* Tab switch row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
-                  onClick={() => setChampTab('abilities')}
+                  onClick={() => handleTabChange('abilities')}
                   style={{
                     background:
                       champTab === 'abilities'
@@ -450,7 +573,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setChampTab('skins')}
+                  onClick={() => handleTabChange('skins')}
                   style={{
                     background:
                       champTab === 'skins'
@@ -473,6 +596,32 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 >
                   <ImageIcon size={13} color={champTab === 'skins' ? 'var(--gold-primary)' : '#64748b'} />
                   Skins & Splash Arts ({skins.length})
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('renders')}
+                  style={{
+                    background:
+                      champTab === 'renders'
+                        ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.3) 0%, rgba(120, 90, 40, 0.4) 100%)'
+                        : 'rgba(15, 23, 42, 0.6)',
+                    border:
+                      champTab === 'renders'
+                        ? '1px solid var(--gold-primary)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: champTab === 'renders' ? '#ffffff' : 'var(--text-secondary)',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <Scissors size={13} color={champTab === 'renders' ? 'var(--gold-primary)' : '#64748b'} />
+                  Transparent Renders ({renders.length})
                 </button>
               </div>
 
@@ -524,7 +673,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               )}
             </div>
 
-            {/* Sub-view Content: Abilities Strip or Skins Carousel */}
+            {/* Sub-view Content: Abilities Strip, Skins Carousel, or Transparent Renders */}
             {champTab === 'abilities' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', padding: '2px 0' }}>
                 {loadingAbilities ? (
@@ -538,8 +687,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                         onClick={() => setActiveAsset(ab)}
                         style={{
                           position: 'relative',
-                          width: 38,
-                          height: 38,
+                          width: 44,
+                          height: 44,
                           borderRadius: 6,
                           overflow: 'hidden',
                           padding: 0,
@@ -561,9 +710,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                             right: 1,
                             background: 'rgba(5, 8, 17, 0.85)',
                             color: 'var(--gold-light)',
-                            fontSize: '0.55rem',
+                            fontSize: '0.58rem',
                             fontWeight: 900,
-                            padding: '0 2px',
+                            padding: '0 3px',
                             borderRadius: 2,
                           }}
                         >
@@ -574,68 +723,261 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   })
                 )}
               </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', padding: '4px 0' }}>
-                {loadingSkins ? (
-                  <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Loading skin catalogue...</span>
-                ) : (
-                  skins.map((sk) => {
-                    const isSelected = activeAsset.id === sk.id;
-                    const targetUrl = skinViewType === 'splash' ? sk.splashUrl : sk.loadingUrl;
-                    return (
+            ) : champTab === 'skins' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Search Bar for Skins */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                      width: 220,
+                    }}
+                  >
+                    <Search size={12} color="var(--text-muted)" />
+                    <input
+                      value={skinSearch}
+                      onChange={(e) => setSkinSearch(e.target.value)}
+                      placeholder={`Search ${skins.length} skins...`}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        fontSize: '0.70rem',
+                        outline: 'none',
+                        width: '100%',
+                      }}
+                    />
+                    {skinSearch && (
                       <button
-                        key={sk.id}
-                        onClick={() => {
-                          setActiveAsset({
-                            ...sk,
-                            cdnUrl: targetUrl,
-                          });
-                        }}
-                        style={{
-                          position: 'relative',
-                          width: 80,
-                          height: 48,
-                          borderRadius: 6,
-                          overflow: 'hidden',
-                          padding: 0,
-                          flexShrink: 0,
-                          border: isSelected ? '2px solid var(--gold-primary)' : '1px solid rgba(200, 170, 110, 0.25)',
-                          boxShadow: isSelected ? '0 0 10px rgba(200, 170, 110, 0.4)' : 'none',
-                          cursor: 'pointer',
-                          background: '#050811',
-                        }}
-                        title={sk.name}
+                        onClick={() => setSkinSearch('')}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
                       >
-                        <img src={sk.splashUrl} alt={sk.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <span
-                          style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            background: 'rgba(5, 8, 17, 0.85)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.55rem',
-                            fontWeight: 700,
-                            padding: '1px 3px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {sk.name}
-                        </span>
+                        <X size={12} />
                       </button>
-                    );
-                  })
-                )}
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    Showing {filteredSkins.length} of {skins.length} skins
+                  </span>
+                </div>
+
+                {/* Skins Scrollable Strip */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    overflowX: 'auto',
+                    padding: '4px 2px',
+                    maxHeight: 88,
+                  }}
+                >
+                  {loadingSkins ? (
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Loading skin catalogue...</span>
+                  ) : filteredSkins.length === 0 ? (
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>No skins match "{skinSearch}"</span>
+                  ) : (
+                    filteredSkins.map((sk) => {
+                      const isSelected = activeAsset.id === sk.id;
+                      const targetUrl = skinViewType === 'splash' ? sk.splashUrl : sk.loadingUrl;
+                      return (
+                        <button
+                          key={sk.id}
+                          onClick={() => {
+                            setActiveAsset({
+                              ...sk,
+                              cdnUrl: targetUrl,
+                            });
+                          }}
+                          style={{
+                            position: 'relative',
+                            width: 120,
+                            height: 68,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            padding: 0,
+                            flexShrink: 0,
+                            border: isSelected ? '2px solid var(--gold-primary)' : '1px solid rgba(200, 170, 110, 0.25)',
+                            boxShadow: isSelected ? '0 0 12px rgba(200, 170, 110, 0.5)' : 'none',
+                            cursor: 'pointer',
+                            background: '#050811',
+                            transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={sk.name}
+                        >
+                          <img
+                            src={sk.splashUrl}
+                            alt={sk.name}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = sk.loadingUrl;
+                            }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'linear-gradient(to top, rgba(5, 8, 17, 0.95) 0%, rgba(5, 8, 17, 0.3) 50%, transparent 100%)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          <span
+                            style={{
+                              position: 'absolute',
+                              bottom: 2,
+                              left: 4,
+                              right: 4,
+                              color: isSelected ? 'var(--gold-light)' : '#ffffff',
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              textAlign: 'left',
+                            }}
+                          >
+                            {sk.name}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Search Bar for Transparent Cutouts */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                      width: 250,
+                    }}
+                  >
+                    <Search size={12} color="var(--text-muted)" />
+                    <input
+                      value={renderSearch}
+                      onChange={(e) => setRenderSearch(e.target.value)}
+                      placeholder={`Search ${renders.length} transparent cutouts...`}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        fontSize: '0.70rem',
+                        outline: 'none',
+                        width: '100%',
+                      }}
+                    />
+                    {renderSearch && (
+                      <button
+                        onClick={() => setRenderSearch('')}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    Showing {filteredRenders.length} of {renders.length} transparent renders
+                  </span>
+                </div>
+
+                {/* Renders Scrollable Strip */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    overflowX: 'auto',
+                    padding: '4px 2px',
+                    maxHeight: 96,
+                  }}
+                >
+                  {loadingRenders ? (
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Loading transparent cutouts...</span>
+                  ) : filteredRenders.length === 0 ? (
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>No transparent cutouts match "{renderSearch}"</span>
+                  ) : (
+                    filteredRenders.map((rn) => {
+                      const isSelected = activeAsset.id === rn.id;
+                      return (
+                        <button
+                          key={rn.id}
+                          onClick={() => setActiveAsset(rn)}
+                          style={{
+                            position: 'relative',
+                            width: 78,
+                            height: 78,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            padding: 3,
+                            flexShrink: 0,
+                            border: isSelected ? '2px solid var(--gold-primary)' : '1px solid rgba(200, 170, 110, 0.25)',
+                            boxShadow: isSelected ? '0 0 12px rgba(200, 170, 110, 0.5)' : 'none',
+                            cursor: 'pointer',
+                            background: 'repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 10px 10px',
+                            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={rn.skinName || rn.name}
+                        >
+                          <img
+                            src={rn.cdnUrl}
+                            alt={rn.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'linear-gradient(to top, rgba(5, 8, 17, 0.95) 0%, rgba(5, 8, 17, 0.1) 40%, transparent 100%)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          <span
+                            style={{
+                              position: 'absolute',
+                              bottom: 2,
+                              left: 2,
+                              right: 2,
+                              color: isSelected ? 'var(--gold-light)' : '#ffffff',
+                              fontSize: '0.54rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {rn.skinName || rn.name}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Comparison Header with View Mode Toggle */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Comparison Header with Scale Switcher & View Mode Toggle */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--gold-light)' }}>
               PREVIEW & RESOLUTION COMPARISON
@@ -656,43 +998,94 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'flex', background: 'rgba(5, 8, 17, 0.8)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 2, gap: 2 }}>
-            <button
-              onClick={() => setViewMode('split')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* In-Modal Scale Switcher */}
+            <div
               style={{
-                background: viewMode === 'split' ? 'rgba(200, 170, 110, 0.25)' : 'transparent',
-                border: viewMode === 'split' ? '1px solid var(--gold-primary)' : '1px solid transparent',
-                color: viewMode === 'split' ? '#fff' : 'var(--text-muted)',
-                borderRadius: 4,
-                padding: '2px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 3,
+                background: 'rgba(5, 8, 17, 0.9)',
+                border: '1px solid var(--border-gold)',
+                borderRadius: 6,
+                padding: '2px 4px',
               }}
             >
-              <ChevronsLeftRight size={12} /> Split Lens
-            </button>
-            <button
-              onClick={() => setViewMode('side_by_side')}
+              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: 'var(--gold-primary)', padding: '0 4px' }}>
+                SCALE:
+              </span>
+              {(['1x', '2x', '4x'] as ResolutionScale[]).map((sc) => {
+                const isSel = selectedScale === sc;
+                return (
+                  <button
+                    key={sc}
+                    onClick={() => setSelectedScale(sc)}
+                    style={{
+                      background: isSel ? 'var(--gold-primary)' : 'transparent',
+                      color: isSel ? '#050811' : 'var(--text-secondary)',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '2px 8px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {sc === '1x' ? '1x (Original)' : sc === '2x' ? '2x HD' : '4x UHD'}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Split Lens vs Side-by-Side */}
+            <div
               style={{
-                background: viewMode === 'side_by_side' ? 'rgba(200, 170, 110, 0.25)' : 'transparent',
-                border: viewMode === 'side_by_side' ? '1px solid var(--gold-primary)' : '1px solid transparent',
-                color: viewMode === 'side_by_side' ? '#fff' : 'var(--text-muted)',
-                borderRadius: 4,
-                padding: '2px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                cursor: 'pointer',
                 display: 'flex',
-                alignItems: 'center',
-                gap: 4,
+                background: 'rgba(5, 8, 17, 0.8)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 6,
+                padding: 2,
+                gap: 2,
               }}
             >
-              <Columns2 size={12} /> Side-by-Side
-            </button>
+              <button
+                onClick={() => setViewMode('split')}
+                style={{
+                  background: viewMode === 'split' ? 'rgba(200, 170, 110, 0.25)' : 'transparent',
+                  border: viewMode === 'split' ? '1px solid var(--gold-primary)' : '1px solid transparent',
+                  color: viewMode === 'split' ? '#fff' : 'var(--text-muted)',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <ChevronsLeftRight size={12} /> Split Lens
+              </button>
+              <button
+                onClick={() => setViewMode('side_by_side')}
+                style={{
+                  background: viewMode === 'side_by_side' ? 'rgba(200, 170, 110, 0.25)' : 'transparent',
+                  border: viewMode === 'side_by_side' ? '1px solid var(--gold-primary)' : '1px solid transparent',
+                  color: viewMode === 'side_by_side' ? '#fff' : 'var(--text-muted)',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Columns2 size={12} /> Side-by-Side
+              </button>
+            </div>
           </div>
         </div>
 
@@ -702,9 +1095,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             style={{
               position: 'relative',
               width: '100%',
-              height: isWideSplash ? 320 : 250,
+              height: isWideSplash ? 330 : isRender ? 300 : 250,
               background:
-                maskShape === 'circle' && !isWideSplash
+                isRender || (maskShape === 'circle' && !isWideSplash)
                   ? 'repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 16px 16px'
                   : 'rgba(5, 8, 17, 0.95)',
               borderRadius: maskShape === 'circle' && !isWideSplash ? '50%' : 8,
@@ -736,7 +1129,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   width: '100%',
                   height: '100%',
                   objectFit: isWideSplash ? 'cover' : 'contain',
-                  imageRendering: 'pixelated', // Exposes compression and low-res pixelation
+                  imageRendering: 'pixelated',
                 }}
               />
             </div>
@@ -752,7 +1145,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor:
-                    maskShape === 'circle' && !isWideSplash
+                    isRender || (maskShape === 'circle' && !isWideSplash)
                       ? 'transparent'
                       : 'rgba(5, 8, 17, 0.95)',
                 }}
@@ -838,7 +1231,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 zIndex: 30,
               }}
             >
-              {previewDataUrl ? `WAIFU2X (${dims.upscaled})` : 'NOT GENERATED YET'}
+              {previewDataUrl
+                ? selectedScale === '1x'
+                  ? `ORIGINAL VIEW (${dims.upscaled})`
+                  : `WAIFU2X (${dims.upscaled})`
+                : 'NOT GENERATED YET'}
             </div>
 
             {/* Center Hint if not generated */}
@@ -858,7 +1255,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               >
                 <Sparkles size={24} color="var(--gold-primary)" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--gold-light)', fontWeight: 700 }}>
-                  Click "Generate {effectiveScale}" to unlock interactive split comparison
+                  Click "Generate {selectedScale}" to unlock interactive split comparison
                 </span>
               </div>
             )}
@@ -879,7 +1276,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               >
                 <Loader2 size={28} color="var(--gold-primary)" className="animate-spin" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--gold-light)', fontWeight: 700 }}>
-                  Inferring waifu2x CU-Net neural network...
+                  Inferring waifu2x CU-Net neural network ({selectedScale})...
                 </span>
               </div>
             )}
@@ -904,15 +1301,17 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               </span>
               <div
                 style={{
-                  width: isWideSplash ? '100%' : 150,
-                  height: isWideSplash ? 160 : 150,
+                  width: isWideSplash ? '100%' : 160,
+                  height: isWideSplash ? 160 : 160,
                   borderRadius: maskShape === 'circle' && !isWideSplash ? '50%' : 8,
                   overflow: 'hidden',
                   border: '1px solid rgba(255,255,255,0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#020408',
+                  background: isRender
+                    ? 'repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 16px 16px'
+                    : '#020408',
                 }}
               >
                 <img
@@ -938,19 +1337,21 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               }}
             >
               <span style={{ fontSize: '0.72rem', color: 'var(--gold-primary)', fontWeight: 800 }}>
-                WAIFU2X CU-NET ({dims.upscaled})
+                {selectedScale === '1x' ? '1X ORIGINAL' : `WAIFU2X ${selectedScale.toUpperCase()}`} ({dims.upscaled})
               </span>
               <div
                 style={{
-                  width: isWideSplash ? '100%' : 150,
-                  height: isWideSplash ? 160 : 150,
+                  width: isWideSplash ? '100%' : 160,
+                  height: isWideSplash ? 160 : 160,
                   borderRadius: maskShape === 'circle' && !isWideSplash ? '50%' : 8,
                   overflow: 'hidden',
                   border: isCached ? '1px solid var(--gold-primary)' : '1px dashed rgba(200,170,110,0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#020408',
+                  background: isRender
+                    ? 'repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 16px 16px'
+                    : '#020408',
                 }}
               >
                 {loading ? (
@@ -958,7 +1359,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 ) : previewDataUrl ? (
                   <img
                     src={previewDataUrl}
-                    alt="Waifu2x Upscaled"
+                    alt="Upscaled Preview"
                     style={{ width: '100%', height: '100%', objectFit: isWideSplash ? 'cover' : 'contain' }}
                   />
                 ) : (
@@ -966,14 +1367,14 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 )}
               </div>
               <span style={{ fontSize: '0.68rem', color: isCached ? 'var(--gold-light)' : 'var(--text-muted)' }}>
-                {isCached ? 'Ultra-sharp illustration output' : 'Not rendered yet'}
+                {isCached ? 'Ultra-sharp output' : 'Not rendered yet'}
               </span>
             </div>
           </div>
         )}
 
-        {/* Triple Controls: Shape, Framing Presets & Noise Reduction */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 1.7fr', gap: 10 }}>
+        {/* Controls: Shape, Framing Presets, Badge Stamping & Noise Reduction */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr 1.15fr 1.3fr', gap: 8 }}>
           {/* Mask Shape */}
           <div
             style={{
@@ -1087,6 +1488,86 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             </div>
           </div>
 
+          {/* Corner Badge Overlay Stamping */}
+          <div
+            style={{
+              background: 'rgba(5, 8, 17, 0.7)',
+              border: stampBadge ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
+              borderRadius: 8,
+              padding: '8px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              boxShadow: stampBadge ? '0 0 12px rgba(200, 170, 110, 0.15)' : 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--gold-light)' }}>
+                STAMP BADGE:
+              </span>
+              {getBadgeText() && (
+                <span
+                  style={{
+                    fontSize: '0.60rem',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    background: stampBadge ? 'rgba(200, 170, 110, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    color: stampBadge ? 'var(--gold-primary)' : 'var(--text-muted)',
+                    fontWeight: 800,
+                  }}
+                >
+                  {getBadgeText()}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button
+                onClick={() => setStampBadge(false)}
+                style={{
+                  flex: 1,
+                  background:
+                    !stampBadge
+                      ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.3) 0%, rgba(120, 90, 40, 0.4) 100%)'
+                      : 'rgba(15, 23, 42, 0.6)',
+                  border: !stampBadge ? '1px solid var(--gold-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  color: !stampBadge ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: 6,
+                  padding: '5px 4px',
+                  fontSize: '0.68rem',
+                  fontWeight: !stampBadge ? 700 : 500,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                Off
+              </button>
+              <button
+                onClick={() => setStampBadge(true)}
+                style={{
+                  flex: 1,
+                  background:
+                    stampBadge
+                      ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.3) 0%, rgba(120, 90, 40, 0.4) 100%)'
+                      : 'rgba(15, 23, 42, 0.6)',
+                  border: stampBadge ? '1px solid var(--gold-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  color: stampBadge ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: 6,
+                  padding: '5px 4px',
+                  fontSize: '0.68rem',
+                  fontWeight: stampBadge ? 700 : 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 3,
+                }}
+                title={getBadgeText() ? `Stamp "${getBadgeText()}" badge into PNG` : 'Stamp corner badge overlay'}
+              >
+                <Tag size={11} /> On
+              </button>
+            </div>
+          </div>
+
           {/* Denoise Level */}
           <div
             style={{
@@ -1130,7 +1611,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           </div>
         </div>
 
-        {/* Action Controls: Clipboard Copy, Drag, & Generate */}
+        {/* Action Controls: Instant Original Drag, Upscaled Drag, Copy, & Generate */}
         <div
           style={{
             display: 'flex',
@@ -1138,31 +1619,60 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             justifyContent: 'space-between',
             paddingTop: 8,
             borderTop: '1px solid var(--border-subtle)',
+            flexWrap: 'wrap',
+            gap: 8,
           }}
         >
-          {/* Drag to Timeline Callout */}
-          <div
-            draggable={isCached}
-            onDragStart={handleDragFromModal}
-            className="btn-hextech"
-            style={{
-              padding: '8px 16px',
-              fontSize: '0.80rem',
-              cursor: isCached ? 'grab' : 'not-allowed',
-              opacity: isCached ? 1 : 0.5,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              border: isCached ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
-            }}
-            title={
-              isCached
-                ? 'Click and drag directly into Premiere Pro, Photoshop, or DaVinci'
-                : 'Please generate this upscale first before dragging'
-            }
-          >
-            <Move size={15} />
-            Drag {effectiveScale} to Timeline
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Instant Drag Original Button (Always Available & Grabbable) */}
+            <div
+              draggable={true}
+              onDragStart={(e) => handleDragFromModal(e, true)}
+              className="btn-hextech"
+              style={{
+                padding: '7px 14px',
+                fontSize: '0.78rem',
+                cursor: 'grab',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 116, 144, 0.4) 100%)',
+                borderColor: '#06b6d4',
+                color: '#67e8f9',
+                fontWeight: 700,
+              }}
+              title="Click and drag the original resolution asset directly into Premiere, DaVinci, or Photoshop instantly without waiting for upscaling"
+            >
+              <Move size={14} />
+              ⚡ Drag Original (Instant)
+            </div>
+
+            {/* Drag Selected Scale Button */}
+            {selectedScale !== '1x' && (
+              <div
+                draggable={isCached}
+                onDragStart={(e) => handleDragFromModal(e, false)}
+                className="btn-hextech"
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '0.78rem',
+                  cursor: isCached ? 'grab' : 'not-allowed',
+                  opacity: isCached ? 1 : 0.4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  border: isCached ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
+                }}
+                title={
+                  isCached
+                    ? `Click and drag the ${selectedScale} upscaled asset into your timeline`
+                    : `Please click "Generate ${selectedScale}" first to upscale this asset`
+                }
+              >
+                <Sparkles size={14} color="var(--gold-primary)" />
+                Drag {selectedScale} Upscaled
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -1172,33 +1682,47 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               disabled={loading}
               className="btn-hextech"
               style={{
-                fontSize: '0.80rem',
-                padding: '8px 14px',
+                fontSize: '0.78rem',
+                padding: '7px 12px',
                 borderColor: copiedSuccess ? '#10b981' : undefined,
                 color: copiedSuccess ? '#10b981' : undefined,
               }}
-              title="Copy native uncompressed bitmap directly to Windows Clipboard (Ctrl+C)"
+              title="Copy bitmap directly to Windows Clipboard (Ctrl+C)"
             >
               {copiedSuccess ? <Check size={14} /> : <Copy size={14} />}
-              {copiedSuccess ? 'Copied to Clipboard!' : 'Copy to Clipboard (Ctrl+C)'}
+              {copiedSuccess ? 'Copied!' : 'Copy to Clipboard'}
             </button>
 
             {/* Generate Button */}
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="btn-hextech btn-blue"
-              style={{ fontSize: '0.80rem', padding: '8px 16px' }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-              {loading
-                ? 'Processing...'
-                : isCached
-                ? `Re-render (${maskShape})`
-                : `Generate ${effectiveScale}`}
-            </button>
+            {selectedScale !== '1x' ? (
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="btn-hextech btn-blue"
+                style={{ fontSize: '0.78rem', padding: '7px 14px' }}
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                {loading
+                  ? 'Upscaling...'
+                  : isCached
+                  ? `Re-render ${selectedScale}`
+                  : `Generate ${selectedScale}`}
+              </button>
+            ) : (
+              (maskShape !== 'square' || frameStyle !== 'none' || stampBadge) && (
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading}
+                  className="btn-hextech btn-blue"
+                  style={{ fontSize: '0.78rem', padding: '7px 14px' }}
+                >
+                  {loading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                  {loading ? 'Processing...' : 'Apply Framing & Mask'}
+                </button>
+              )
+            )}
 
-            <button onClick={onClose} className="btn-hextech" style={{ fontSize: '0.80rem' }}>
+            <button onClick={onClose} className="btn-hextech" style={{ fontSize: '0.78rem', padding: '7px 14px' }}>
               Close
             </button>
           </div>
