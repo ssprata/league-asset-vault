@@ -34,6 +34,7 @@ import {
   Scissors,
   Search,
 } from 'lucide-react';
+import { showToast } from './Toast';
 
 interface PreviewModalProps {
   asset: AnyAsset | null;
@@ -434,6 +435,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const result = await window.electronAPI.copyImageToClipboard(targetPath);
         if (result.success) {
           setCopiedSuccess(true);
+          showToast('Copied to clipboard', 'success', `${activeAsset.name || activeAsset.id} (${selectedScale})`);
           setTimeout(() => setCopiedSuccess(false), 2000);
         }
       }
@@ -472,6 +474,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const result = await window.electronAPI.exportAsset(targetPath, cleanName);
         if (result.success) {
           setExportedSuccess(true);
+          showToast('Saved to disk', 'success', result.savedPath || cleanName);
           setTimeout(() => setExportedSuccess(false), 2500);
         }
       }

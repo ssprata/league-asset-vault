@@ -10,12 +10,17 @@ let mainWindow: BrowserWindow | null = null;
 let currentActiveVersion = '14.24.1'; // Updated dynamically on launch
 
 function createWindow(): void {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.join(__dirname, '../../resources/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 860,
     minWidth: 1040,
     minHeight: 700,
     title: 'League Asset Vault - LoL High-Res Asset Library',
+    icon: iconPath,
     backgroundColor: '#070b12',
     autoHideMenuBar: true,
     show: false,

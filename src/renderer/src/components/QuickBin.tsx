@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AnyAsset, ResolutionScale, MaskShape } from '@shared/types';
 import { Bookmark, ChevronDown, ChevronUp, Copy, Move, Trash2, X, Check, FolderArchive, Loader2 } from 'lucide-react';
+import { showToast } from './Toast';
 
 interface QuickBinProps {
   pinnedAssets: AnyAsset[];
@@ -87,6 +88,7 @@ export const QuickBin: React.FC<QuickBinProps> = ({
         const clipRes = await window.electronAPI.copyImageToClipboard(res.filePath);
         if (clipRes.success) {
           setCopiedId(asset.id);
+          showToast('Copied to clipboard', 'success', asset.name || asset.id);
           setTimeout(() => setCopiedId(null), 1600);
         }
       }
@@ -126,7 +128,10 @@ export const QuickBin: React.FC<QuickBinProps> = ({
       }
 
       if (filePaths.length > 0) {
-        await window.electronAPI.batchExport(filePaths);
+        const batchRes = await window.electronAPI.batchExport(filePaths);
+        if (batchRes.success && batchRes.count) {
+          showToast(`Exported ${batchRes.count} pinned assets`, 'success');
+        }
       }
     } catch (err) {
       console.error('Failed to batch export pinned assets:', err);

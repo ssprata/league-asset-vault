@@ -82,6 +82,36 @@ League Asset Vault solves this workflow bottleneck. It fetches official game ass
 - Safe cache purging: Deletes all generated upscaled files while preserving core configuration files (`versions.json`, manifest caches) and downloaded 1x originals.
 - One-click button to open the cache directory in Windows Explorer.
 
+### 12. Broadcast PCM WAV Audio Library
+- Over 40+ authentic League sound effects: Classic Announcer voice lines, summoner spell sounds (Flash, Ignite, Smite, Teleport), active items (Zhonya's, Ruined King, Guardian Angel), and tactical pings.
+- Standardized 16-bit 44.1kHz PCM WAV audio for direct zero-latency drag-and-drop into Adobe Premiere Pro and DaVinci Resolve audio tracks.
+- Global master volume slider with persistent settings and real-time audio playback preview.
+
+### 13. "My Upscales" Library & Batch Exporter
+- Dedicated asset manager tab listing all previously upscaled 2x HD and 4x UHD files currently stored on disk.
+- Multi-select capability with "Select All" and individual checkmarks.
+- 1-click **Batch Export to Folder**: copies selected or filtered files directly to any destination folder on your PC.
+- Selective file deletion with instant cache disk space recovery indicator.
+
+### 14. Champion Lane Filtering & Slang Aliases
+- Curated lane filter chips: **Top, Jungle, Mid, Bot / ADC, Support**, including accurate flex picks (e.g. Lux in Mid/Support, Yasuo in Mid/Top/ADC).
+- Community slang and acronym search engine:
+  - Champions: `MF` (Miss Fortune), `TF` (Twisted Fate), `GP` (Gangplank), `ASol` (Aurelion Sol), `WW` (Warwick).
+  - Items: `IE` (Infinity Edge), `BORK` (Blade of the Ruined King), `BT` (Bloodthirster), `DCap` (Rabadon's Deathcap), `Tabis`, `Mercs`, `GA`, `RFC`.
+  - Spells: `Ghost`, `Cleanse`, `Exhaust`, `Barrier`.
+
+### 15. Global Keyboard Shortcuts & Toast Feedback
+- Built-in shortcuts for high-speed editor workflows:
+  - `Ctrl + F` / `/`: Focus global search bar.
+  - `Ctrl + B`: Toggle QuickBin favorites dock.
+  - `Esc`: Close any active modal.
+  - `Ctrl + C`: Copy uncompressed DIB bitmap to OS clipboard.
+  - `Ctrl + S`: Trigger Save As export dialog in Preview Modal.
+  - `1` / `2` / `4`: Switch upscale preview resolution (1x, 2x HD, 4x UHD).
+  - `s` / `b`: Toggle Split Comparison Lens vs Side-by-Side view.
+  - `ArrowLeft` / `ArrowRight`: Cycle through champion abilities and skins in Preview Modal.
+- Non-intrusive Hextech toast notifications confirming clipboard copy, QuickBin actions, and file exports.
+
 ---
 
 ## Technology Stack
@@ -177,7 +207,13 @@ Starts the Vite dev server with Hot Module Replacement (HMR) and launches the El
 npm run dev
 ```
 
-### 4. Build Standalone Executable
+### 4. Run Automated Test Suite
+Runs the Vitest test runner validating alias matching, lane filtering, and cache fingerprinting:
+```bash
+npm test
+```
+
+### 5. Build Standalone Executable
 To generate an unpacked Windows directory containing the runnable `.exe`:
 ```bash
 npm run package:dir

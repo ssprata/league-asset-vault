@@ -283,10 +283,11 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
             style={{ position: 'absolute', left: 12, pointerEvents: 'none' }}
           />
           <input
+            id="global-search-input"
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={getPlaceholder()}
+            placeholder={getPlaceholder() + ' (Ctrl+F)'}
             style={{
               width: '100%',
               background: 'rgba(5, 8, 17, 0.85)',

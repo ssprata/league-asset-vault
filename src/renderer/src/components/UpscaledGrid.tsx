@@ -14,6 +14,7 @@ import {
   Square,
   AlertTriangle,
 } from 'lucide-react';
+import { showToast } from './Toast';
 
 interface UpscaledGridProps {
   assets: UpscaledAssetInfo[];
@@ -42,6 +43,7 @@ export const UpscaledGrid: React.FC<UpscaledGridProps> = ({
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState<boolean>(false);
+  const [batchExportNotice, setBatchExportNotice] = useState<{ count: number; dir: string } | null>(null);
 
   // Filter assets based on search query and tag
   const filteredAssets = useMemo(() => {
@@ -100,6 +102,7 @@ export const UpscaledGrid: React.FC<UpscaledGridProps> = ({
       const res = await window.electronAPI.copyImageToClipboard(filePath);
       if (res.success) {
         setCopiedPath(filePath);
+        showToast('Copied to clipboard', 'success');
         setTimeout(() => setCopiedPath(null), 2000);
       }
     } catch (err) {
@@ -112,6 +115,7 @@ export const UpscaledGrid: React.FC<UpscaledGridProps> = ({
       const res = await window.electronAPI.exportAsset(filePath, fileName);
       if (res.success) {
         setExportedPath(filePath);
+        showToast('Saved to disk', 'success', res.savedPath || fileName);
         setTimeout(() => setExportedPath(null), 2000);
       }
     } catch (err) {
@@ -129,8 +133,9 @@ export const UpscaledGrid: React.FC<UpscaledGridProps> = ({
     setIsExporting(true);
     try {
       const res = await window.electronAPI.batchExport(pathsToExport);
-      if (res.success && res.exportedCount) {
-        console.log(`Successfully exported ${res.exportedCount} files to ${res.targetDir}`);
+      if (res.success && res.count && res.exportDir) {
+        setBatchExportNotice({ count: res.count, dir: res.exportDir });
+        setTimeout(() => setBatchExportNotice(null), 5000);
       }
     } catch (err) {
       console.error('Batch export failed:', err);
@@ -184,6 +189,46 @@ export const UpscaledGrid: React.FC<UpscaledGridProps> = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Batch Export Success Notification Banner */}
+      {batchExportNotice && (
+        <div
+          style={{
+            background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)',
+            borderBottom: '1px solid #10b981',
+            color: '#a7f3d0',
+            padding: '8px 24px',
+            fontSize: '0.82rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            animation: 'fadeIn 0.2s ease-in-out',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Check size={16} color="#10b981" />
+            <span>
+              Successfully exported <strong>{batchExportNotice.count}</strong> files to:
+              <span style={{ color: '#ffffff', marginLeft: 6, fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                {batchExportNotice.dir}
+              </span>
+            </span>
+          </div>
+          <button
+            onClick={() => setBatchExportNotice(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#a7f3d0',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Bulk Action Bar */}
       <div
         style={{

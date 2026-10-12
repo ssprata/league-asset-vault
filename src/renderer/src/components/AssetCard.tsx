@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AnyAsset, ResolutionScale, MaskShape, SummonerSpellAsset, AbilityAsset, RuneAsset } from '@shared/types';
 import { Zap, Eye, Move, Bookmark, Copy, Check } from 'lucide-react';
+import { showToast } from './Toast';
 
 interface AssetCardProps {
   asset: AnyAsset;
@@ -96,6 +97,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({
         const clipRes = await window.electronAPI.copyImageToClipboard(res.filePath);
         if (clipRes.success) {
           setCopied(true);
+          showToast('Copied to clipboard', 'success', `${asset.name || asset.id} (${scale})`);
           setTimeout(() => setCopied(false), 1800);
         }
       }

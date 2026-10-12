@@ -10,7 +10,8 @@
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build": "npm.cmd run build:renderer && npm.cmd run build:electron && electron-builder",
-    "package:dir": "npm.cmd run build:renderer && npm.cmd run build:electron && electron-builder --dir"
+    "package:dir": "npm.cmd run build:renderer && npm.cmd run build:electron && electron-builder --dir",
+    "test": "vitest run"
   },
   "keywords": [
     "league-of-legends",
@@ -41,6 +42,7 @@
     "electron-builder": "^25.1.8",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
+    "vitest": "^5.0.4",
     "wait-on": "^8.0.2"
   },
   "build": {
@@ -54,12 +56,17 @@
       "dist-electron/**/*"
     ],
     "win": {
+      "icon": "resources/icon.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "extraResources": [
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      },
       {
         "from": "resources/bin/waifu2x",
         "to": "bin/waifu2x",

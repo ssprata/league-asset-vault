@@ -23,6 +23,7 @@ import { StatusBar } from './components/StatusBar';
 import { QuickBin } from './components/QuickBin';
 import { SettingsModal } from './components/SettingsModal';
 import { matchAssetWithAliases, matchChampionLane } from '@shared/aliases';
+import { ToastContainer, showToast } from './components/Toast';
 import { Loader2 } from 'lucide-react';
 
 const QUICKBIN_STORAGE_KEY = 'league-asset-vault:quickbin';
@@ -108,13 +109,16 @@ export const App: React.FC = () => {
     const exists = pinnedAssets.some((p) => p.id === asset.id);
     if (exists) {
       savePinnedAssets(pinnedAssets.filter((p) => p.id !== asset.id));
+      showToast('Removed from Quick Bin', 'info', asset.name || asset.id);
     } else {
       savePinnedAssets([...pinnedAssets, asset]);
+      showToast('Pinned to Quick Bin', 'success', asset.name || asset.id);
     }
   };
 
   const handleUnpin = (assetId: string) => {
     savePinnedAssets(pinnedAssets.filter((p) => p.id !== assetId));
+    showToast('Removed from Quick Bin', 'info');
   };
 
   const handleClearQuickBin = () => {
@@ -122,6 +126,39 @@ export const App: React.FC = () => {
   };
 
   const pinnedIds = useMemo(() => new Set(pinnedAssets.map((p) => p.id)), [pinnedAssets]);
+
+  // Global Keyboard Shortcuts (Ctrl+F search focus, Ctrl+B toggle quickbin, Esc close modal)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
+
+      if (e.key === 'Escape') {
+        if (previewAsset) {
+          setPreviewAsset(null);
+        } else if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search-input') as HTMLInputElement | null;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !isInput) {
+        e.preventDefault();
+        setIsQuickBinOpen((prev) => {
+          const next = !prev;
+          showToast(next ? 'Quick Bin Opened' : 'Quick Bin Collapsed', 'info');
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [previewAsset, isSettingsOpen]);
 
   // Initialize versions and settings on startup
   useEffect(() => {
@@ -440,6 +477,9 @@ export const App: React.FC = () => {
         masterVolume={masterVolume}
         onMasterVolumeChange={handleMasterVolumeChange}
       />
+
+      {/* Floating Action Feedback Toasts */}
+      <ToastContainer />
     </div>
   );
 };
