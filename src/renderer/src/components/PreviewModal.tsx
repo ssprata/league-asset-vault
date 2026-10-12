@@ -126,8 +126,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           window.electronAPI.getChampionRenders(currentVersion, champ!.id),
         ]);
         if (isSubscribed) {
+          // Strictly exclude chromas from Skins & Splash Arts: chromas have no 2D splash arts on Riot CDN
+          const validSkins = skinList.filter((sk) => {
+            return !sk.isChroma && (sk as any).parentSkin === undefined && (sk as any).parentSkinId === undefined;
+          });
           setAbilities(abList);
-          setSkins(skinList);
+          setSkins(validSkins);
           setRenders(renderList);
 
           // If currently focused on generic champion icon, switch activeAsset to the first sub-item
@@ -528,6 +532,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
   // Filtered skins & renders for search inputs
   const filteredSkins = skins.filter((sk) => {
+    if (sk.isChroma || (sk as any).parentSkin !== undefined || (sk as any).parentSkinId !== undefined) {
+      return false;
+    }
     if (!skinSearch.trim()) return true;
     return sk.name.toLowerCase().includes(skinSearch.toLowerCase());
   });
@@ -925,7 +932,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                             transform: isSelected ? 'scale(1.03)' : 'scale(1)',
                             transition: 'all 0.15s ease',
                           }}
-                          title={sk.chromas ? `${sk.name} (Has Chromas)` : sk.name}
+                          title={sk.chromas ? `${sk.name} (Has Chromas - Viewable in Transparent Renders)` : sk.name}
                         >
                           <img
                             src={sk.splashUrl}

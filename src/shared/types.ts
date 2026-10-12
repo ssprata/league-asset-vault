@@ -110,6 +110,8 @@ export interface SkinAsset {
   loadingFileName?: string;
   hasSplash?: boolean;
   isChroma?: boolean;
+  parentSkin?: number;
+  parentSkinId?: number;
   cdnUrl: string;
   cachedOriginalPath?: string;
   cachedUpscaledPath?: string;

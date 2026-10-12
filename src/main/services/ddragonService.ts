@@ -407,6 +407,15 @@ export class DDragonService {
 
     const skins: SkinAsset[] = [];
     for (const s of champData.skins) {
+      // Exclude chromas: Riot Data Dragon (e.g. 16.20.1+) includes chromas in the skins array
+      // with a 'parentSkin' property. Chromas do NOT have official 2D splash arts on Riot CDN.
+      if (s.parentSkin !== undefined && s.parentSkin !== null) {
+        continue;
+      }
+      if (s.isChroma || s.chroma) {
+        continue;
+      }
+
       const num = s.num;
       const skinName = s.name === 'default' ? `${champData.name} (Default)` : s.name;
       const splashFile = `${championId}_${num}_splash.png`;
