@@ -21,6 +21,8 @@ import {
   Loader2,
   Copy,
   Check,
+  Download,
+  ImageOff,
   Circle,
   Square,
   ArrowLeft,
@@ -72,6 +74,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [cachedFilePath, setCachedFilePath] = useState<string | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
+  const [exportedSuccess, setExportedSuccess] = useState(false);
+  const [activeImgError, setActiveImgError] = useState(false);
 
   // Gallery search queries
   const [skinSearch, setSkinSearch] = useState('');
@@ -91,6 +95,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   // Sync initial asset when modal opens
   useEffect(() => {
     setActiveAsset(asset);
+    setActiveImgError(false);
     if (asset?.type === 'champion') {
       setParentChampion(asset as ChampionAsset);
       setChampTab('abilities');
@@ -98,6 +103,10 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       setParentChampion(null);
     }
   }, [asset]);
+
+  useEffect(() => {
+    setActiveImgError(false);
+  }, [activeAsset]);
 
   // Load champion abilities, skins, and transparent character renders
   useEffect(() => {
@@ -125,9 +134,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             if (champTab === 'abilities' && abList.length > 0) {
               setActiveAsset(abList[0]);
             } else if (champTab === 'skins' && skinList.length > 0) {
+              const first = skinList[0];
               setActiveAsset({
-                ...skinList[0],
-                cdnUrl: skinViewType === 'splash' ? skinList[0].splashUrl : skinList[0].loadingUrl,
+                ...first,
+                imageFileName: skinViewType === 'splash'
+                  ? (first.splashFileName || `${first.championId}_${first.num}_splash.png`)
+                  : (first.loadingFileName || `${first.championId}_${first.num}_loading.png`),
+                cdnUrl: skinViewType === 'splash' ? first.splashUrl : first.loadingUrl,
               });
             } else if (champTab === 'renders' && renderList.length > 0) {
               setActiveAsset(renderList[0]);
@@ -163,6 +176,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const first = skins[0];
         setActiveAsset({
           ...first,
+          imageFileName: skinViewType === 'splash'
+            ? (first.splashFileName || `${first.championId}_${first.num}_splash.png`)
+            : (first.loadingFileName || `${first.championId}_${first.num}_loading.png`),
           cdnUrl: skinViewType === 'splash' ? first.splashUrl : first.loadingUrl,
         });
       }
@@ -176,16 +192,58 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   // Keyboard navigation & shortcuts
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in a search input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') {
+        if (e.key === 'Escape') onClose();
+        return;
+      }
+
       if (e.key === 'Escape') {
         onClose();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         e.preventDefault();
         handleCopy();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleExport();
+      } else if (e.key === '1') {
+        setSelectedScale('1x');
+      } else if (e.key === '2') {
+        setSelectedScale('2x');
+      } else if (e.key === '4') {
+        setSelectedScale('4x');
+      } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
+        setViewMode('split');
+      } else if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey) {
+        setViewMode('side_by_side');
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        if (champTab === 'skins' && skins.length > 0) {
+          const idx = skins.findIndex((s) => s.id === activeAsset?.id);
+          if (idx !== -1) {
+            const nextIdx = e.key === 'ArrowRight'
+              ? (idx + 1) % skins.length
+              : (idx - 1 + skins.length) % skins.length;
+            const nextSkin = skins[nextIdx];
+            const targetUrl = skinViewType === 'splash' ? nextSkin.splashUrl : nextSkin.loadingUrl;
+            const targetFileName = skinViewType === 'splash'
+              ? (nextSkin.splashFileName || `${nextSkin.championId}_${nextSkin.num}_splash.png`)
+              : (nextSkin.loadingFileName || `${nextSkin.championId}_${nextSkin.num}_loading.png`);
+            setActiveAsset({ ...nextSkin, cdnUrl: targetUrl, imageFileName: targetFileName });
+          }
+        } else if (champTab === 'abilities' && abilities.length > 0) {
+          const idx = abilities.findIndex((a) => a.id === activeAsset?.id);
+          if (idx !== -1) {
+            const nextIdx = e.key === 'ArrowRight'
+              ? (idx + 1) % abilities.length
+              : (idx - 1 + abilities.length) % abilities.length;
+            setActiveAsset(abilities[nextIdx]);
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, cachedFilePath, activeAsset, selectedScale]);
+  }, [onClose, cachedFilePath, activeAsset, selectedScale, champTab, skins, abilities, skinViewType]);
 
   // Slider dragging handlers
   useEffect(() => {
@@ -385,6 +443,44 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
+  const handleExport = async () => {
+    try {
+      let targetPath = cachedFilePath;
+      if (!targetPath) {
+        setLoading(true);
+        const res = await window.electronAPI.generateUpscale({
+          assetId: activeAsset.id,
+          assetType: activeAsset.type,
+          scale: selectedScale,
+          noiseLevel: selectedDenoise,
+          maskShape,
+          frameStyle,
+          stampBadge,
+          badgeText: getBadgeText(),
+          imageFileName: activeAsset.imageFileName,
+          cdnUrl: activeAsset.cdnUrl,
+        });
+        targetPath = res.filePath;
+        setPreviewDataUrl(res.dataUrl);
+        setCachedFilePath(res.filePath);
+        setIsCached(true);
+        setLoading(false);
+      }
+
+      if (targetPath) {
+        const cleanName = `${activeAsset.name || activeAsset.id}_${selectedScale}.png`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+        const result = await window.electronAPI.exportAsset(targetPath, cleanName);
+        if (result.success) {
+          setExportedSuccess(true);
+          setTimeout(() => setExportedSuccess(false), 2500);
+        }
+      }
+    } catch (err) {
+      console.error('Export asset failed:', err);
+      setLoading(false);
+    }
+  };
+
   const handleDragFromModal = (e: React.DragEvent, forceOriginal: boolean = false) => {
     e.preventDefault();
     const scaleToUse: ResolutionScale = forceOriginal || selectedScale === '1x' ? '1x' : selectedScale;
@@ -419,6 +515,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
     if (isRender) {
       const rn = activeAsset as RenderAsset;
+      if (rn.isChroma) {
+        return `${rn.championId} &bull; ${rn.skinName || 'Chroma Cutout'} &bull; Color Variant Cutout`;
+      }
       return `${rn.championId} &bull; ${rn.skinName || 'Character Cutout'} &bull; Transparent Alpha PNG`;
     }
     return `Item Cost: ${(activeAsset as any).goldTotal || 0} Gold`;
@@ -632,7 +731,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       setSkinViewType('splash');
                       if (activeAsset.type === 'skin') {
                         const sk = activeAsset as SkinAsset;
-                        setActiveAsset({ ...sk, cdnUrl: sk.splashUrl });
+                        setActiveAsset({
+                          ...sk,
+                          cdnUrl: sk.splashUrl,
+                          imageFileName: sk.splashFileName || `${sk.championId}_${sk.num}_splash.png`,
+                        });
                       }
                     }}
                     style={{
@@ -653,7 +756,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       setSkinViewType('loading');
                       if (activeAsset.type === 'skin') {
                         const sk = activeAsset as SkinAsset;
-                        setActiveAsset({ ...sk, cdnUrl: sk.loadingUrl });
+                        setActiveAsset({
+                          ...sk,
+                          cdnUrl: sk.loadingUrl,
+                          imageFileName: sk.loadingFileName || `${sk.championId}_${sk.num}_loading.png`,
+                        });
                       }
                     }}
                     style={{
@@ -787,6 +894,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     filteredSkins.map((sk) => {
                       const isSelected = activeAsset.id === sk.id;
                       const targetUrl = skinViewType === 'splash' ? sk.splashUrl : sk.loadingUrl;
+                      const targetFileName = skinViewType === 'splash'
+                        ? (sk.splashFileName || `${sk.championId}_${sk.num}_splash.png`)
+                        : (sk.loadingFileName || `${sk.championId}_${sk.num}_loading.png`);
                       return (
                         <button
                           key={sk.id}
@@ -794,6 +904,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                             setActiveAsset({
                               ...sk,
                               cdnUrl: targetUrl,
+                              imageFileName: targetFileName,
                             });
                           }}
                           style={{
@@ -811,7 +922,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                             transform: isSelected ? 'scale(1.03)' : 'scale(1)',
                             transition: 'all 0.15s ease',
                           }}
-                          title={sk.name}
+                          title={sk.chromas ? `${sk.name} (Has Chromas)` : sk.name}
                         >
                           <img
                             src={sk.splashUrl}
@@ -821,6 +932,26 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                             }}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
+                          {sk.chromas && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 3,
+                                background: 'rgba(5, 8, 17, 0.85)',
+                                color: '#38bdf8',
+                                fontSize: '0.52rem',
+                                fontWeight: 800,
+                                padding: '1px 4px',
+                                borderRadius: 3,
+                                border: '1px solid rgba(56, 189, 248, 0.4)',
+                                zIndex: 5,
+                              }}
+                              title="This skin has color variant chromas"
+                            >
+                              Chromas
+                            </span>
+                          )}
                           <div
                             style={{
                               position: 'absolute',
@@ -1122,16 +1253,29 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           >
             {/* Background Layer: 1x Original CDN Asset */}
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img
-                src={activeAsset.cdnUrl}
-                alt="Original 1x"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: isWideSplash ? 'cover' : 'contain',
-                  imageRendering: 'pixelated',
-                }}
-              />
+              {activeImgError ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 20, textAlign: 'center' }}>
+                  <ImageOff size={36} color="#f59e0b" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f3f4f6' }}>2D Artwork Not Available</span>
+                  <span style={{ fontSize: '0.72rem', maxWidth: 320, color: 'var(--text-secondary)' }}>
+                    {isRender && (activeAsset as RenderAsset).isChroma
+                      ? 'Riot does not produce 2D splash arts for chromas / variant colors.'
+                      : 'This skin variant does not have an official 2D illustration on Riot CDN.'}
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={activeAsset.cdnUrl}
+                  alt="Original 1x"
+                  onError={() => setActiveImgError(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: isWideSplash ? 'cover' : 'contain',
+                    imageRendering: 'pixelated',
+                  }}
+                />
+              )}
             </div>
 
             {/* Foreground Layer (Clipped at splitPos): Waifu2x Upscaled Art */}
@@ -1314,11 +1458,19 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     : '#020408',
                 }}
               >
-                <img
-                  src={activeAsset.cdnUrl}
-                  alt="Original"
-                  style={{ width: '100%', height: '100%', objectFit: isWideSplash ? 'cover' : 'contain', imageRendering: 'pixelated' }}
-                />
+                {activeImgError ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--text-muted)', padding: 12, textAlign: 'center' }}>
+                    <ImageOff size={24} style={{ opacity: 0.5 }} />
+                    <span style={{ fontSize: '0.72rem' }}>Artwork not available</span>
+                  </div>
+                ) : (
+                  <img
+                    src={activeAsset.cdnUrl}
+                    alt="Original"
+                    onError={() => setActiveImgError(true)}
+                    style={{ width: '100%', height: '100%', objectFit: isWideSplash ? 'cover' : 'contain', imageRendering: 'pixelated' }}
+                  />
+                )}
               </div>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Source pixelation & artifacts</span>
             </div>
@@ -1691,6 +1843,23 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             >
               {copiedSuccess ? <Check size={14} /> : <Copy size={14} />}
               {copiedSuccess ? 'Copied!' : 'Copy to Clipboard'}
+            </button>
+
+            {/* Save As... File Export */}
+            <button
+              onClick={handleExport}
+              disabled={loading}
+              className="btn-hextech"
+              style={{
+                fontSize: '0.78rem',
+                padding: '7px 12px',
+                borderColor: exportedSuccess ? '#10b981' : undefined,
+                color: exportedSuccess ? '#10b981' : undefined,
+              }}
+              title="Save upscaled image directly to your PC (Ctrl+S)"
+            >
+              {exportedSuccess ? <Check size={14} /> : <Download size={14} />}
+              {exportedSuccess ? 'Saved!' : 'Save As...'}
             </button>
 
             {/* Generate Button */}

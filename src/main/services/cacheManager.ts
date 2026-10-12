@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app, shell } from 'electron';
-import { AssetType, CacheStats, ResolutionScale, DenoiseLevel, MaskShape, FrameStyle } from '../../shared/types';
+import { AssetType, CacheStats, ResolutionScale, DenoiseLevel, MaskShape, FrameStyle, UpscaledAssetInfo } from '../../shared/types';
 
 /**
  * Formats byte values to human-readable strings (B, KB, MB, GB).
@@ -204,6 +204,109 @@ export class CacheManager {
 
     clearUpscaledDirs(this.baseCacheDir);
     return await this.getStats();
+  }
+
+  /**
+   * Scans and returns all upscaled assets on disk with metadata.
+   */
+  public async getUpscaledAssets(version?: string): Promise<UpscaledAssetInfo[]> {
+    const list: UpscaledAssetInfo[] = [];
+    if (!fs.existsSync(this.baseCacheDir)) return list;
+
+    const typeFolders: { folder: string; type: AssetType }[] = [
+      { folder: 'champions', type: 'champion' },
+      { folder: 'items', type: 'item' },
+      { folder: 'summoners', type: 'summoner' },
+      { folder: 'abilities', type: 'ability' },
+      { folder: 'runes', type: 'rune' },
+      { folder: 'skins', type: 'skin' },
+      { folder: 'renders', type: 'render' },
+      { folder: 'audio', type: 'audio' },
+    ];
+
+    const scales: { folder: string; scale: ResolutionScale }[] = [
+      { folder: 'upscaled_4x', scale: '4x' },
+      { folder: 'upscaled_2x', scale: '2x' },
+    ];
+
+    const scanVersionDir = (vDir: string) => {
+      for (const scaleInfo of scales) {
+        for (const typeInfo of typeFolders) {
+          const targetDir = path.join(vDir, scaleInfo.folder, typeInfo.folder);
+          if (fs.existsSync(targetDir)) {
+            try {
+              const files = fs.readdirSync(targetDir);
+              for (const file of files) {
+                const fullPath = path.join(targetDir, file);
+                try {
+                  const stat = fs.statSync(fullPath);
+                  if (stat.isFile() && stat.size > 0) {
+                    let assetId = path.basename(file, path.extname(file));
+                    if (assetId.includes('_scale')) {
+                      assetId = assetId.split('_scale')[0];
+                    }
+                    list.push({
+                      filePath: fullPath,
+                      fileName: file,
+                      assetId,
+                      assetType: typeInfo.type,
+                      scale: scaleInfo.scale,
+                      sizeBytes: stat.size,
+                      formattedSize: formatBytes(stat.size),
+                      modifiedTimeMs: stat.mtimeMs,
+                    });
+                  }
+                } catch (e) {}
+              }
+            } catch (e) {}
+          }
+        }
+      }
+    };
+
+    if (version) {
+      scanVersionDir(this.getVersionDir(version));
+    } else {
+      try {
+        const entries = fs.readdirSync(this.baseCacheDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && entry.name !== 'audio') {
+            scanVersionDir(path.join(this.baseCacheDir, entry.name));
+          }
+        }
+      } catch (e) {}
+    }
+
+    return list.sort((a, b) => b.modifiedTimeMs - a.modifiedTimeMs);
+  }
+
+  /**
+   * Selectively deletes specific files from disk.
+   */
+  public async deleteCachedFiles(
+    filePaths: string[]
+  ): Promise<{ success: boolean; deletedCount: number; freedBytes: number }> {
+    let deletedCount = 0;
+    let freedBytes = 0;
+
+    for (const f of filePaths) {
+      try {
+        if (fs.existsSync(f)) {
+          const stat = fs.statSync(f);
+          freedBytes += stat.size;
+          fs.unlinkSync(f);
+          deletedCount++;
+        }
+      } catch (err) {
+        console.warn(`[CacheManager] Failed to delete ${f}:`, err);
+      }
+    }
+
+    return {
+      success: true,
+      deletedCount,
+      freedBytes,
+    };
   }
 
   /**

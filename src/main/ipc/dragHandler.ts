@@ -28,7 +28,25 @@ export function registerDragHandler(currentVersionGetter: () => string): void {
         badgeText,
         imageFileName,
         cdnUrl: requestCdnUrl,
+        filePath: directFilePath,
       } = request;
+
+      // Direct pre-existing file path drag (e.g. from My Upscales Library)
+      if (directFilePath && fs.existsSync(directFilePath)) {
+        const absolutePath = path.resolve(directFilePath);
+        let dragIcon = nativeImage.createFromPath(absolutePath);
+        if (dragIcon.isEmpty()) {
+          dragIcon = nativeImage.createEmpty();
+        } else {
+          dragIcon = dragIcon.resize({ width: 64, height: 64 });
+        }
+        event.sender.startDrag({
+          file: absolutePath,
+          icon: dragIcon,
+        });
+        console.log(`[DragHandler] Initiated direct filePath CF_HDROP drag payload: ${absolutePath}`);
+        return;
+      }
 
       // Special Handling for Native Audio Files
       if (assetType === 'audio') {

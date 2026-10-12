@@ -6,7 +6,8 @@ export type AssetType =
   | 'rune'
   | 'skin'
   | 'render'
-  | 'audio';
+  | 'audio'
+  | 'upscaled';
 
 export type ResolutionScale = '1x' | '2x' | '4x';
 
@@ -105,6 +106,10 @@ export interface SkinAsset {
   splashUrl: string;
   loadingUrl: string;
   imageFileName: string;
+  splashFileName?: string;
+  loadingFileName?: string;
+  hasSplash?: boolean;
+  isChroma?: boolean;
   cdnUrl: string;
   cachedOriginalPath?: string;
   cachedUpscaledPath?: string;
@@ -118,6 +123,9 @@ export interface RenderAsset {
   championKey?: string; // e.g. "266"
   skinId?: number;     // e.g. 266002
   skinName?: string;   // e.g. "Mecha Aatrox"
+  parentSkinId?: number;
+  parentSkinName?: string;
+  isChroma?: boolean;
   name: string;        // e.g. "Mecha Aatrox Render"
   imageFileName: string;
   cdnUrl: string;
@@ -198,6 +206,7 @@ export interface DragStartRequest {
   skinViewType?: 'splash' | 'loading';
   imageFileName?: string;
   cdnUrl?: string;
+  filePath?: string;
 }
 
 export interface DragStartResult {
@@ -228,6 +237,19 @@ export interface UpscaleGenerateResult {
   error?: string;
 }
 
+export interface UpscaledAssetInfo {
+  filePath: string;
+  fileName: string;
+  assetId: string;
+  assetType: AssetType;
+  scale: ResolutionScale;
+  sizeBytes: number;
+  formattedSize: string;
+  modifiedTimeMs: number;
+  dataUrl?: string;
+  badgeText?: string;
+}
+
 export interface AppElectronAPI {
   // Data Dragon & CDragon APIs
   getVersions: () => Promise<string[]>;
@@ -244,9 +266,11 @@ export interface AppElectronAPI {
   getAudioPlayUrl: (asset: AudioAsset) => Promise<string>;
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) => Promise<string>;
 
-  // OS Native Drag & Clipboard APIs
+  // OS Native Drag, Export & Clipboard APIs
   startDrag: (request: DragStartRequest) => Promise<DragStartResult>;
   copyImageToClipboard: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  exportAsset: (filePath: string, defaultName?: string) => Promise<{ success: boolean; canceled?: boolean; savedPath?: string }>;
+  batchExport: (filePaths: string[]) => Promise<{ success: boolean; canceled?: boolean; exportDir?: string; count?: number }>;
 
   // Upscaling APIs
   upscaleAsset: (
@@ -263,9 +287,11 @@ export interface AppElectronAPI {
   cancelBatchUpscale: () => Promise<void>;
   onUpscaleProgress: (callback: (progress: UpscaleProgressPayload) => void) => () => void;
 
-  // Cache Management APIs
+  // Cache & Upscaled Library APIs
   getCacheStats: () => Promise<CacheStats>;
   getCacheSize: () => Promise<CacheStats>;
+  getUpscaledAssets: (version?: string) => Promise<UpscaledAssetInfo[]>;
+  deleteCachedFiles: (filePaths: string[]) => Promise<{ success: boolean; deletedCount: number; freedBytes: number }>;
   openCacheDir: () => Promise<void>;
   openCacheFolder: () => Promise<void>;
   clearCache: () => Promise<{ success: boolean; stats: CacheStats }>;

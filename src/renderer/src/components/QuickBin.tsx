@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnyAsset, ResolutionScale, MaskShape } from '@shared/types';
-import { Bookmark, ChevronDown, ChevronUp, Copy, Move, Trash2, X, Check } from 'lucide-react';
+import { Bookmark, ChevronDown, ChevronUp, Copy, Move, Trash2, X, Check, FolderArchive, Loader2 } from 'lucide-react';
 
 interface QuickBinProps {
   pinnedAssets: AnyAsset[];
@@ -9,7 +9,7 @@ interface QuickBinProps {
   scale: ResolutionScale;
   maskShape?: MaskShape;
   stampBadge?: boolean;
-  onPreview: (asset: AnyAsset) => void;
+  onPreview: (asset) => void;
 }
 
 export const QuickBin: React.FC<QuickBinProps> = ({
@@ -23,6 +23,7 @@ export const QuickBin: React.FC<QuickBinProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   if (pinnedAssets.length === 0) {
     return null;
@@ -94,6 +95,46 @@ export const QuickBin: React.FC<QuickBinProps> = ({
     }
   };
 
+  const handleExportAllPinned = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pinnedAssets.length === 0 || isExporting) return;
+    setIsExporting(true);
+    try {
+      const filePaths: string[] = [];
+      for (const asset of pinnedAssets) {
+        if (asset.type === 'audio') {
+          const audio = asset as any;
+          const p = await window.electronAPI.ensureAudioCached(audio);
+          if (p) filePaths.push(p);
+        } else {
+          const res = await window.electronAPI.generateUpscale({
+            assetId: asset.id,
+            assetType: asset.type,
+            scale,
+            noiseLevel: 3,
+            maskShape,
+            frameStyle: 'none',
+            stampBadge,
+            badgeText: getBadgeText(asset),
+            imageFileName: (asset as any).imageFileName,
+            cdnUrl: asset.cdnUrl,
+          });
+          if (res.success && res.filePath) {
+            filePaths.push(res.filePath);
+          }
+        }
+      }
+
+      if (filePaths.length > 0) {
+        await window.electronAPI.batchExport(filePaths);
+      }
+    } catch (err) {
+      console.error('Failed to batch export pinned assets:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -151,6 +192,30 @@ export const QuickBin: React.FC<QuickBinProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Batch Export All Pinned to Folder */}
+          <button
+            onClick={handleExportAllPinned}
+            disabled={isExporting}
+            style={{
+              background: 'rgba(200, 170, 110, 0.15)',
+              border: '1px solid var(--gold-primary)',
+              borderRadius: 6,
+              color: 'var(--gold-light)',
+              fontSize: '0.70rem',
+              fontWeight: 700,
+              cursor: isExporting ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '3px 8px',
+              transition: 'all 0.15s ease',
+            }}
+            title="Batch export all pinned assets to a destination folder on your computer"
+          >
+            {isExporting ? <Loader2 size={12} className="animate-spin" /> : <FolderArchive size={12} />}
+            {isExporting ? 'Exporting...' : 'Export All to Folder...'}
+          </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();

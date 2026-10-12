@@ -11,16 +11,18 @@ import {
   AnyAsset,
   CacheStats,
   UpscaleProgressPayload,
+  UpscaledAssetInfo,
 } from '@shared/types';
 import { Header } from './components/Header';
 import { SearchFilter } from './components/SearchFilter';
 import { AssetGrid } from './components/AssetGrid';
 import { AudioGrid } from './components/AudioGrid';
+import { UpscaledGrid } from './components/UpscaledGrid';
 import { PreviewModal } from './components/PreviewModal';
 import { StatusBar } from './components/StatusBar';
 import { QuickBin } from './components/QuickBin';
 import { SettingsModal } from './components/SettingsModal';
-import { matchAssetWithAliases } from '@shared/aliases';
+import { matchAssetWithAliases, matchChampionLane } from '@shared/aliases';
 import { Loader2 } from 'lucide-react';
 
 const QUICKBIN_STORAGE_KEY = 'league-asset-vault:quickbin';
@@ -34,6 +36,7 @@ export const App: React.FC = () => {
   const [summoners, setSummoners] = useState<SummonerSpellAsset[]>([]);
   const [runes, setRunes] = useState<RuneAsset[]>([]);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
+  const [upscaledAssets, setUpscaledAssets] = useState<UpscaledAssetInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Global Master Volume state (default 30% / 0.30)
@@ -167,13 +170,14 @@ export const App: React.FC = () => {
   const loadDataForVersion = async (ver: string) => {
     setLoading(true);
     try {
-      const [champsData, itemsData, summonersData, runesData, audioData, stats] = await Promise.all([
+      const [champsData, itemsData, summonersData, runesData, audioData, stats, upscaledList] = await Promise.all([
         window.electronAPI.getChampions(ver),
         window.electronAPI.getItems(ver),
         window.electronAPI.getSummonerSpells(ver),
         window.electronAPI.getRunes(ver),
         window.electronAPI.getAudioAssets(ver),
         window.electronAPI.getCacheStats(),
+        window.electronAPI.getUpscaledAssets(ver),
       ]);
       setChampions(champsData);
       setItems(itemsData);
@@ -181,6 +185,7 @@ export const App: React.FC = () => {
       setRunes(runesData);
       setAudioAssets(audioData);
       setCacheStats(stats);
+      setUpscaledAssets(upscaledList || []);
     } catch (err) {
       console.error('Failed loading version data:', err);
     } finally {
@@ -193,10 +198,20 @@ export const App: React.FC = () => {
     await loadDataForVersion(ver);
   };
 
+  const loadUpscaledAssets = async (ver?: string) => {
+    try {
+      const list = await window.electronAPI.getUpscaledAssets(ver || currentVersion);
+      setUpscaledAssets(list || []);
+    } catch (e) {
+      console.warn('Failed loading upscaled assets:', e);
+    }
+  };
+
   const refreshCacheStats = async () => {
     try {
       const stats = await window.electronAPI.getCacheStats();
       setCacheStats(stats);
+      await loadUpscaledAssets();
     } catch (e) {
       console.error(e);
     }
@@ -231,6 +246,11 @@ export const App: React.FC = () => {
             (selectedTag === 'Voice Lines' &&
               (cat === 'champion_vo' || cat === 'champion_sfx' || cat === 'vo' || cat === 'sfx'));
           if (!hasTag && !matchCat) return false;
+        } else if (
+          asset.type === 'champion' &&
+          ['Top', 'Jungle', 'Mid', 'Bot / ADC', 'Support'].includes(selectedTag)
+        ) {
+          if (!matchChampionLane(asset.id, selectedTag)) return false;
         } else {
           if (!asset.tags || !asset.tags.includes(selectedTag)) return false;
         }
@@ -326,16 +346,17 @@ export const App: React.FC = () => {
         summonerCount={summoners.length}
         runeCount={runes.length}
         audioCount={audioAssets.length}
+        upscaledCount={upscaledAssets.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedTag={selectedTag}
         onTagSelect={setSelectedTag}
-        filteredCount={filteredAssets.length}
+        filteredCount={activeTab === 'upscaled' ? upscaledAssets.length : filteredAssets.length}
         masterVolume={masterVolume}
         onMasterVolumeChange={handleMasterVolumeChange}
       />
 
-      {/* Main Asset Grid or Audio Grid */}
+      {/* Main Asset Grid, Audio Grid, or My Upscales Grid */}
       {loading ? (
         <div
           style={{
@@ -353,6 +374,16 @@ export const App: React.FC = () => {
             Syncing Riot Data Dragon Catalog v{currentVersion}...
           </div>
         </div>
+      ) : activeTab === 'upscaled' ? (
+        <UpscaledGrid
+          assets={upscaledAssets}
+          onRefresh={() => {
+            loadUpscaledAssets();
+            refreshCacheStats();
+          }}
+          searchQuery={searchQuery}
+          selectedTag={selectedTag}
+        />
       ) : activeTab === 'audio' ? (
         <AudioGrid assets={filteredAssets as AudioAsset[]} volume={masterVolume} />
       ) : (

@@ -410,6 +410,7 @@ export class DDragonService {
       const num = s.num;
       const skinName = s.name === 'default' ? `${champData.name} (Default)` : s.name;
       const splashFile = `${championId}_${num}_splash.png`;
+      const loadingFile = `${championId}_${num}_loading.png`;
       const originalCached = cacheManager.assetExists(version, 'skin', splashFile, '1x');
       const upscaled4xCached = cacheManager.assetExists(version, 'skin', splashFile, '4x');
 
@@ -420,9 +421,13 @@ export class DDragonService {
         num,
         name: skinName,
         chromas: !!s.chromas,
+        hasSplash: true,
+        isChroma: false,
         splashUrl: DDRAGON_ENDPOINTS.SPLASH_IMAGE(championId, num),
         loadingUrl: DDRAGON_ENDPOINTS.LOADING_IMAGE(championId, num),
         imageFileName: splashFile,
+        splashFileName: splashFile,
+        loadingFileName: loadingFile,
         cdnUrl: DDRAGON_ENDPOINTS.SPLASH_IMAGE(championId, num),
         cachedOriginalPath: originalCached
           ? cacheManager.getAssetPath(version, 'skin', splashFile, '1x')
@@ -504,6 +509,9 @@ export class DDragonService {
             championKey,
             skinId,
             skinName: skin.name,
+            parentSkinId: skin.id,
+            parentSkinName: skin.name,
+            isChroma: false,
             name: `${skin.name} (Render)`,
             imageFileName,
             cdnUrl,
@@ -539,6 +547,9 @@ export class DDragonService {
                 championKey,
                 skinId,
                 skinName: cName,
+                parentSkinId: skin.id,
+                parentSkinName: skin.name,
+                isChroma: true,
                 name: `${cName} (Render)`,
                 imageFileName,
                 cdnUrl,

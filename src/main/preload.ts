@@ -38,13 +38,17 @@ const api: AppElectronAPI = {
   ensureAssetCached: (asset: AnyAsset, scale: ResolutionScale) =>
     ipcRenderer.invoke(IPC_CHANNELS.ENSURE_ASSET_CACHED, asset, scale),
 
-  // OS Native Drag & Clipboard APIs
+  // OS Native Drag, Export & Clipboard APIs
   startDrag: (request: DragStartRequest) => {
     ipcRenderer.send(IPC_CHANNELS.START_DRAG, request);
     return Promise.resolve({ success: true });
   },
   copyImageToClipboard: (filePath: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.CLIPBOARD_COPY, filePath),
+  exportAsset: (filePath: string, defaultName?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_ASSET_DIALOG, filePath, defaultName),
+  batchExport: (filePaths: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BATCH_EXPORT_DIALOG, filePaths),
 
   // Upscaling APIs
   upscaleAsset: (
@@ -84,9 +88,13 @@ const api: AppElectronAPI = {
     };
   },
 
-  // Cache Management APIs
+  // Cache & Upscaled Library APIs
   getCacheStats: () => ipcRenderer.invoke(IPC_CHANNELS.GET_CACHE_STATS),
   getCacheSize: () => ipcRenderer.invoke(IPC_CHANNELS.CALCULATE_SIZE),
+  getUpscaledAssets: (version?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_UPSCALED_ASSETS, version),
+  deleteCachedFiles: (filePaths: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_CACHED_FILES, filePaths),
   openCacheDir: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CACHE_DIR),
   openCacheFolder: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CACHE_DIR),
   clearCache: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_CACHE),

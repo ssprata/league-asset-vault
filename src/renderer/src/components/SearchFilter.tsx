@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AssetType } from '@shared/types';
-import { CHAMPION_TAGS, ITEM_TAGS, RUNE_TAGS, AUDIO_TAGS } from '@shared/constants';
-import { Search, X, Users, Package, Wand2, Sparkles, Volume2, Volume1, VolumeX } from 'lucide-react';
+import { CHAMPION_TAGS, ITEM_TAGS, RUNE_TAGS, AUDIO_TAGS, UPSCALED_TAGS, ITEM_DISPLAY_TAGS } from '@shared/constants';
+import { Search, X, Users, Package, Wand2, Sparkles, Volume2, Volume1, VolumeX, Zap } from 'lucide-react';
 
 const SUMMONER_TAGS = ['All', 'CLASSIC', 'ARAM', 'CHERRY', 'URF'] as const;
 
@@ -13,6 +13,7 @@ interface SearchFilterProps {
   summonerCount: number;
   runeCount?: number;
   audioCount?: number;
+  upscaledCount?: number;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   selectedTag: string;
@@ -30,6 +31,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
   summonerCount,
   runeCount = 0,
   audioCount = 0,
+  upscaledCount = 0,
   searchQuery,
   onSearchChange,
   selectedTag,
@@ -58,13 +60,16 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
       ? RUNE_TAGS
       : activeTab === 'audio'
       ? AUDIO_TAGS
+      : activeTab === 'upscaled'
+      ? UPSCALED_TAGS
       : SUMMONER_TAGS;
 
   const getPlaceholder = () => {
-    if (activeTab === 'champion') return 'Search champions, titles (e.g. Yasuo, Blade, ASol)...';
-    if (activeTab === 'item') return 'Search items, slang (e.g. BORK, IE, Tabis)...';
+    if (activeTab === 'champion') return 'Search champions, titles, lanes (e.g. Yasuo, Blade, Top)...';
+    if (activeTab === 'item') return 'Search items, stats, slang (e.g. BORK, IE, Armor, AP)...';
     if (activeTab === 'rune') return 'Search runes, keystones (e.g. Conq, PTA, First Strike)...';
     if (activeTab === 'audio') return 'Search sound effects, voice lines (e.g. Flash, Zhonya, Missing ping, Ace)...';
+    if (activeTab === 'upscaled') return 'Search upscaled library by name, scale, or type...';
     return 'Search summoner spells (e.g. Flash, Ignite, Smite)...';
   };
 
@@ -231,6 +236,35 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
             <Volume2 size={15} color={activeTab === 'audio' ? '#c8aa6e' : '#64748b'} />
             Audio SFX ({audioCount})
           </button>
+
+          {/* My Upscales Library */}
+          <button
+            onClick={() => {
+              onTabChange('upscaled');
+              onTagSelect('All');
+            }}
+            style={{
+              background:
+                activeTab === 'upscaled'
+                  ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(120, 90, 40, 0.35) 100%)'
+                  : 'transparent',
+              border: activeTab === 'upscaled' ? '1px solid var(--gold-primary)' : '1px solid transparent',
+              color: activeTab === 'upscaled' ? '#ffffff' : 'var(--text-secondary)',
+              padding: '6px 14px',
+              borderRadius: 6,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              transition: 'all 0.15s ease',
+            }}
+            title="View, export, or manage all generated 2x/4x HD and UHD assets"
+          >
+            <Zap size={15} color={activeTab === 'upscaled' ? '#c8aa6e' : '#64748b'} />
+            My Upscales ({upscaledCount})
+          </button>
         </div>
 
         {/* Instant Search Bar */}
@@ -314,6 +348,12 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
           </span>
           {currentTags.map((tag) => {
             const isSelected = selectedTag === tag;
+            const isLane = activeTab === 'champion' && ['Top', 'Jungle', 'Mid', 'Bot / ADC', 'Support'].includes(tag);
+            let displayLabel = tag;
+            if (activeTab === 'item' && ITEM_DISPLAY_TAGS[tag]) {
+              displayLabel = ITEM_DISPLAY_TAGS[tag];
+            }
+
             return (
               <button
                 key={tag}
@@ -321,18 +361,36 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
                 style={{
                   background: isSelected
                     ? 'linear-gradient(135deg, rgba(200, 170, 110, 0.3) 0%, rgba(120, 90, 40, 0.4) 100%)'
+                    : isLane
+                    ? 'rgba(30, 41, 59, 0.7)'
                     : 'rgba(15, 23, 42, 0.6)',
-                  border: isSelected ? '1px solid var(--gold-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                  border: isSelected
+                    ? '1px solid var(--gold-primary)'
+                    : isLane
+                    ? '1px solid rgba(200, 170, 110, 0.3)'
+                    : '1px solid rgba(255, 255, 255, 0.08)',
+                  color: isSelected
+                    ? '#ffffff'
+                    : isLane
+                    ? '#e2e8f0'
+                    : 'var(--text-secondary)',
                   fontSize: '0.72rem',
-                  fontWeight: isSelected ? 700 : 500,
+                  fontWeight: isSelected ? 700 : isLane ? 600 : 500,
                   padding: '3px 10px',
                   borderRadius: 14,
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
               >
-                {tag}
+                {isLane && (
+                  <span style={{ fontSize: '0.60rem', color: isSelected ? '#ffffff' : 'var(--gold-light)', fontWeight: 800 }}>
+                    ROLE:
+                  </span>
+                )}
+                {displayLabel}
               </button>
             );
           })}

@@ -66,6 +66,10 @@ export const IPC_CHANNELS = {
   CALCULATE_SIZE: 'cache:calculate-size',
   OPEN_CACHE_DIR: 'cache:open-dir',
   CLEAR_CACHE: 'cache:clear',
+  GET_UPSCALED_ASSETS: 'cache:get-upscaled-assets',
+  DELETE_CACHED_FILES: 'cache:delete-files',
+  SAVE_ASSET_DIALOG: 'dialog:save-asset',
+  BATCH_EXPORT_DIALOG: 'dialog:batch-export',
   PRECACHE_ALL: 'cache:precache-all',
   PRECACHE_PROGRESS: 'cache:precache-progress',
   GET_SETTINGS: 'settings:get',
@@ -90,12 +94,16 @@ export const DENOISE_OPTIONS = [
 
 export const CHAMPION_TAGS = [
   'All',
+  'Top',
+  'Jungle',
+  'Mid',
+  'Bot / ADC',
+  'Support',
   'Fighter',
   'Mage',
   'Assassin',
   'Tank',
   'Marksman',
-  'Support',
 ] as const;
 
 export const ITEM_TAGS = [
@@ -112,6 +120,21 @@ export const ITEM_TAGS = [
   'Boots',
   'Consumable',
 ] as const;
+
+export const ITEM_DISPLAY_TAGS: Record<string, string> = {
+  All: 'All',
+  Damage: 'AD (Attack Damage)',
+  SpellDamage: 'AP (Ability Power)',
+  Armor: 'Armor',
+  SpellBlock: 'Magic Resist',
+  Health: 'Health',
+  Mana: 'Mana',
+  AttackSpeed: 'Attack Speed',
+  CriticalStrike: 'Crit Chance',
+  LifeSteal: 'Life Steal',
+  Boots: 'Boots',
+  Consumable: 'Consumables',
+};
 
 export const RUNE_TAGS = [
   'All',
@@ -136,5 +159,17 @@ export const AUDIO_TAGS = [
   'Pings',
   'Voice Lines',
   'Announcer',
+] as const;
+
+export const UPSCALED_TAGS = [
+  'All',
+  '4x UHD',
+  '2x HD',
+  'Champions',
+  'Skins',
+  'Renders',
+  'Items',
+  'Runes',
+  'Spells',
 ] as const;
 
